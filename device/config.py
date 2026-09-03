@@ -24,7 +24,7 @@ def _audio_device(name: str) -> str | int | None:
 
 @dataclass(frozen=True)
 class DeviceConfig:
-    device_id: str = os.getenv("DEVICE_ID", "marcos-01")
+    device_id: str = os.getenv("DEVICE_ID", "ideraldinho-01")
     token: str = os.getenv("DEVICE_TOKEN", "dev-token")
     gateway_url: str = os.getenv("GATEWAY_URL", "ws://localhost:8000/ws")
     input_device: str | int | None = _audio_device("AUDIO_INPUT_DEVICE")

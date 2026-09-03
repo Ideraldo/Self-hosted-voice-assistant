@@ -48,7 +48,7 @@ from device.state import StateMachine  # noqa: E402
 from device.tts import PiperVoiceEngine  # noqa: E402
 from device.ws_client import ConnectionLost, GatewayClient  # noqa: E402
 
-log = logging.getLogger("marcos.device")
+log = logging.getLogger("ideraldinho.device")
 
 
 async def read_line(prompt: str) -> str:
@@ -121,7 +121,7 @@ async def handle_incoming(
             # inteira. A final é a mesma coisa junta, só para a tela.
             if message.final:
                 continue
-            print(f"  marcos> {message.text}")
+            print(f"  ideraldinho> {message.text}")
             async with falando:
                 elapsed = await speak(voice, speaker, message.text)
             if spoke_at is None:
@@ -186,7 +186,7 @@ async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
         async def anunciar(item) -> None:
             async with falando:
                 texto = services.anunciar(item)
-                print(f"\n  marcos> {texto}   [{item.kind}]")
+                print(f"\n  ideraldinho> {texto}   [{item.kind}]")
                 await speak(voice, speaker, texto)
 
         scheduler = Scheduler(store, anunciar)
@@ -202,10 +202,10 @@ async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
                 if not client.online:
                     print("gateway: fora do ar -- timer, alarme e hora continuam")
                 if text_mode:
-                    print("Marcos -- modo texto. Ctrl+C para sair.\n")
+                    print("Ideraldinho -- modo texto. Ctrl+C para sair.\n")
                     await text_loop(client, machine, voice, speaker, services, falando)
                 else:
-                    print("Marcos -- fale quando quiser. Ctrl+C para sair.\n")
+                    print("Ideraldinho -- fale quando quiser. Ctrl+C para sair.\n")
                     with Microphone(
                         device=config.input_device,
                         silence_ms=config.vad_silence_ms,
@@ -290,7 +290,7 @@ async def answer(client, machine, voice, speaker, services, falando, text: str) 
     if intent is not None:
         resposta = services.handle(intent)
         if resposta is not None:
-            print(f"  marcos> {resposta}   [nivel 0, local]")
+            print(f"  ideraldinho> {resposta}   [nivel 0, local]")
             _ate_falar(machine)
             async with falando:
                 await speak(voice, speaker, resposta)
@@ -336,7 +336,7 @@ async def voice_loop(client, machine, microphone, stt, voice, speaker, services,
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="dispositivo do Marcos")
+    parser = argparse.ArgumentParser(description="dispositivo do Ideraldinho")
     parser.add_argument(
         "--text",
         action="store_true",

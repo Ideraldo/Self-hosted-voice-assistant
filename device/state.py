@@ -7,7 +7,7 @@ from typing import Callable
 
 from common.messages import Emotion, State
 
-log = logging.getLogger("marcos.state")
+log = logging.getLogger("ideraldinho.state")
 
 ALLOWED: dict[State, set[State]] = {
     State.IDLE: {State.LISTENING},

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Iterable
 
-log = logging.getLogger("marcos.playback")
+log = logging.getLogger("ideraldinho.playback")
 
 
 class Speaker:

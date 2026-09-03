@@ -167,7 +167,7 @@ class TestLeitor:
         leitor = leitor_falso(monkeypatch, handler)
         await leitor.ler("https://exemplo.com/x")
         assert "Mozilla" not in vistos[0]
-        assert "Marcos" in vistos[0] and "https://" in vistos[0]
+        assert "Ideraldinho" in vistos[0] and "https://" in vistos[0]
 
     async def test_corta_pagina_gigante(self, monkeypatch):
         leitor = leitor_falso(monkeypatch, lambda r: html("<p>" + "palavra " * 50_000 + "</p>"))

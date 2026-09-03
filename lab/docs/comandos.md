@@ -363,7 +363,7 @@ Para conferir isso, é só não subir o terminal 2:
 ```powershell
 py -m device.main --text
 # voce: poe um timer de 5 segundos
-#   marcos> Timer de 5 segundos.   [nivel 0, local]
+#   ideraldinho> Timer de 5 segundos.   [nivel 0, local]
 ```
 
 Variáveis relevantes em `.env`:

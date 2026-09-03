@@ -81,7 +81,7 @@ Corpus ampliado para 315 frases. **Dataset final: 315 gravações, 30,9 min.**
 
 ### Fine-tune v2: fechado na época 996
 
-**A voz oficial do Marcos é a época 996**, exportada como
+**A voz oficial do Ideraldinho é a época 996**, exportada como
 `pt_BR-ideraldo-medium`. Avaliação do usuário: *"não ficou perfeito, mas está
 convincente"*.
 

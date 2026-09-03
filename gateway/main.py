@@ -24,7 +24,7 @@ from gateway.tools import (  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
-app = FastAPI(title="Marcos gateway")
+app = FastAPI(title="Ideraldinho gateway")
 
 
 def build_llm() -> LLMProvider:

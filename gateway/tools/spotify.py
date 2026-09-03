@@ -28,7 +28,7 @@ import httpx
 
 from gateway.llm.base import Tool
 
-log = logging.getLogger("marcos.spotify")
+log = logging.getLogger("ideraldinho.spotify")
 
 API = "https://api.spotify.com/v1"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
@@ -67,7 +67,7 @@ def _casar_aparelho(devices: list[dict], nome: str) -> dict | None:
 
     Três tentativas, nesta ordem:
 
-    1. **Nome exato** -- para "Marcos" não perder para "Marcos (quarto)" quando
+    1. **Nome exato** -- para "Ideraldinho" não perder para "Ideraldinho (quarto)" quando
        os dois existirem.
     2. **Trecho do nome** -- ninguém diz "Echo Dot de Ideraldo" inteiro, diz
        "echo".
@@ -145,7 +145,7 @@ class SpotifyClient:
         self._timeout = timeout
         # O nome do aparelho onde tocar quando ninguém disser onde. A ideia é
         # que seja a própria Pi, rodando raspotify/librespot: aí "toca Chico
-        # Buarque" sai no alto-falante do Marcos, como sairia numa Alexa, em vez
+        # Buarque" sai no alto-falante do Ideraldinho, como sairia numa Alexa, em vez
         # de num PC que pode estar em outro cômodo.
         self._preferido = preferido or None
         self._access: str | None = None
@@ -314,8 +314,8 @@ class SpotifyClient:
         # Mas nem tudo que não casa é engano do modelo: pedir para tocar num
         # aparelho que existe e está desligado é um pedido legítimo, e nesse
         # caso jogar o nome na busca esconde o problema -- foi o que aconteceu
-        # com "toca no marcos" antes de a Pi existir, que virou uma busca por
-        # "Construção Marcos" e tocou outra versão da música.
+        # com "toca no ideraldinho" antes de a Pi existir, que virou uma busca por
+        # "Construção Ideraldinho" e tocou outra versão da música.
         if aparelho and not await self._existe_aparelho(aparelho):
             if self._parece_aparelho(aparelho):
                 # Sem artigo: "o tv" e "o caixa de som" saem errados, e a

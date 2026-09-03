@@ -176,7 +176,7 @@ class TestTocar:
 
 
 class TestEscolhaDeAparelho:
-    """Onde tocar quando ninguem diz onde -- e o que faz o Marcos ser a caixa de
+    """Onde tocar quando ninguem diz onde -- e o que faz o Ideraldinho ser a caixa de
     som em vez de um controle remoto do PC."""
 
     @pytest.mark.asyncio
@@ -184,9 +184,9 @@ class TestEscolhaDeAparelho:
         api, client = fake
         api.devices = [
             {"id": "pc", "is_active": True, "name": "RUIPC"},
-            {"id": "pi", "is_active": False, "name": "Marcos"},
+            {"id": "pi", "is_active": False, "name": "Ideraldinho"},
         ]
-        client._preferido = "Marcos"
+        client._preferido = "Ideraldinho"
         assert await client._device_id() == "pi"
 
     @pytest.mark.asyncio
@@ -198,17 +198,17 @@ class TestEscolhaDeAparelho:
             {"id": "pc", "is_active": False, "name": "RUIPC"},
             {"id": "echo", "is_active": True, "name": "Echo Dot de Ideraldo"},
         ]
-        client._preferido = "Marcos"
+        client._preferido = "Ideraldinho"
         assert await client._device_id() == "echo"
 
     @pytest.mark.asyncio
     async def test_o_que_a_pessoa_pediu_ganha_do_preferido(self, fake):
         api, client = fake
         api.devices = [
-            {"id": "pi", "is_active": True, "name": "Marcos"},
+            {"id": "pi", "is_active": True, "name": "Ideraldinho"},
             {"id": "echo", "is_active": False, "name": "Echo Dot de Ideraldo"},
         ]
-        client._preferido = "Marcos"
+        client._preferido = "Ideraldinho"
         assert await client._device_id("echo dot") == "echo"
 
     @pytest.mark.asyncio
@@ -222,10 +222,10 @@ class TestEscolhaDeAparelho:
     async def test_nome_exato_ganha_de_trecho(self, fake):
         api, client = fake
         api.devices = [
-            {"id": "quarto", "is_active": False, "name": "Marcos (quarto)"},
-            {"id": "pi", "is_active": False, "name": "Marcos"},
+            {"id": "quarto", "is_active": False, "name": "Ideraldinho (quarto)"},
+            {"id": "pi", "is_active": False, "name": "Ideraldinho"},
         ]
-        assert await client._device_id("Marcos") == "pi"
+        assert await client._device_id("Ideraldinho") == "pi"
 
     @pytest.mark.asyncio
     async def test_aparelho_inexistente_diz_quais_existem(self, fake):
@@ -238,7 +238,7 @@ class TestEscolhaDeAparelho:
     async def test_tocar_no_aparelho_pedido(self, fake):
         api, client = fake
         api.devices = [
-            {"id": "pi", "is_active": True, "name": "Marcos"},
+            {"id": "pi", "is_active": True, "name": "Ideraldinho"},
             {"id": "echo", "is_active": False, "name": "Echo Dot de Ideraldo"},
         ]
         await executar_spotify(client, "tocar_musica", {"busca": "x", "aparelho": "echo"})
@@ -336,13 +336,13 @@ class TestQuandoOModeloConfundeOsCampos:
 
     @pytest.mark.asyncio
     async def test_o_preferido_desligado_avisa_em_vez_de_buscar(self, fake):
-        # "toca no marcos" com a Pi desligada nao pode virar uma busca por
-        # "Construcao Marcos" -- foi o que aconteceu, e tocou outra versao.
+        # "toca no ideraldinho" com a Pi desligada nao pode virar uma busca por
+        # "Construcao Ideraldinho" -- foi o que aconteceu, e tocou outra versao.
         api, client = fake
         api.devices = [{"id": "pc", "is_active": True, "name": "RUIPC", "type": "Computer"}]
-        client._preferido = "Marcos"
+        client._preferido = "Ideraldinho"
         with pytest.raises(SpotifyError, match="nao achei"):
-            await client.tocar("Construcao", aparelho="marcos")
+            await client.tocar("Construcao", aparelho="ideraldinho")
         assert api.ultima_busca is None  # nem chegou a buscar
 
     @pytest.mark.asyncio

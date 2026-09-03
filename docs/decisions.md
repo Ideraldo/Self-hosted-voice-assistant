@@ -402,7 +402,7 @@ container que um dia sobe numa VPS pequena.
   (medido: 5,8 GB de `.venv`, 7,0 GB de `lab/models`, 28 GB de `lab/finetune`)
   antes de a primeira linha do Dockerfile rodar. O `.gitignore` não vale aqui —
   o Docker não lê aquele arquivo.
-- **O processo rodava como root.** Corrigido: usuário `marcos`, uid 1000.
+- **O processo rodava como root.** Corrigido: usuário `ideraldinho`, uid 1000.
 
 **Consequências:**
 - Uma dependência nova do gateway tem que ser adicionada em
@@ -668,7 +668,7 @@ Fica em `LLM_THINK` para não ser uma escolha trancada no código.
 rascunho em nenhum dos dois modos. O qwen3:4b devolveu o rascunho como conteúdo:
 
 ```
-marcos> Okay, the user is asking for the capital of Australia...
+ideraldinho> Okay, the user is asking for the capital of Australia...
 ```
 
 Num assistente de voz isso não é um log feio: é o aparelho **falando** isso em
@@ -724,7 +724,7 @@ Verificado com o Spotify desligado:
 
 ```
 voce> toca chico buarque
-marcos> Nao sei tocar Chico Buarque.
+ideraldinho> Nao sei tocar Chico Buarque.
         Posso ajudar com timers, alarmes ou listar/agendar coisas?
 ```
 
@@ -804,7 +804,7 @@ que ação virou prosa, e faz prosa no turno seguinte.** Com o Spotify ligado:
 
 ```
 voce> pausa a musica
-marcos> Pausando a musica.        <- e a musica continuou tocando
+ideraldinho> Pausando a musica.        <- e a musica continuou tocando
 ```
 
 Um assistente que diz ter feito o que não fez é pior que um que recusa.
@@ -846,13 +846,13 @@ era a correção.
 e a seção 14 registra `librespot` como alternativa ao Spotify Connect. Não diz
 onde a música deve sair.
 
-**O que mudou:** `SPOTIFY_DEVICE` (padrão `Marcos`) nomeia o aparelho onde tocar
+**O que mudou:** `SPOTIFY_DEVICE` (padrão `Ideraldinho`) nomeia o aparelho onde tocar
 quando ninguém disser onde. A escolha passa a ser, em ordem: o aparelho que a
 pessoa nomeou na frase → o preferido da configuração → o que está ativo → o
 primeiro da lista. Entraram duas ferramentas, `listar_aparelhos` e
 `trocar_aparelho`, e `tocar_musica` ganhou um campo `aparelho` opcional.
 
-**Por quê:** é a diferença entre o Marcos **ser** a caixa de som e ser um
+**Por quê:** é a diferença entre o Ideraldinho **ser** a caixa de som e ser um
 controle remoto do PC. A Alexa que ele substitui é, para o Spotify, apenas um
 Spotify Connect device — apareceu na lista da conta como `Echo Dot de Ideraldo`.
 Na Pi o equivalente é o **raspotify** (empacotamento do `librespot`), que se
@@ -864,7 +864,7 @@ login com a conta diretamente e não usa a Web API; os escopos já autorizados
 aparelhos e transferir. O *Web Playback SDK* continua sem uso — ele serve para
 tocar dentro de um navegador.
 
-**Enquanto a Pi não existe**, o nome `Marcos` não casa com nada e a escolha cai
+**Enquanto a Pi não existe**, o nome `Ideraldinho` não casa com nada e a escolha cai
 para o aparelho ativo. Verificado com a conta real, tocando de verdade em cada
 um:
 
@@ -875,7 +875,7 @@ um:
 | `"echo dot"` | Echo Dot de Ideraldo |
 | `"caixa de som"` | Echo Dot (pelo tipo `Speaker`) |
 | nada | o aparelho ativo, porque o preferido não existe |
-| `"marcos"` | *"não achei marcos entre os aparelhos ligados"* |
+| `"ideraldinho"` | *"não achei ideraldinho entre os aparelhos ligados"* |
 | `"geladeira"` | volta para a busca — não parece aparelho |
 
 O celular só entra na lista quando o app está aberto e ativo no aparelho: um
@@ -909,8 +909,8 @@ compreensível.
 
 **E a correção da correção.** Dobrar tudo que não casa para dentro da busca
 esconde o caso legítimo: pedir para tocar num aparelho que **existe e está
-desligado**. Testando *"toca no marcos"* antes de a Pi existir, a busca virou
-"Construção Marcos" e tocou outra gravação — silenciosamente. Agora o nome só é
+desligado**. Testando *"toca no ideraldinho"* antes de a Pi existir, a busca virou
+"Construção Ideraldinho" e tocou outra gravação — silenciosamente. Agora o nome só é
 dobrado na busca se **não parecer** referência a aparelho; parece quando é o
 nome configurado em `SPOTIFY_DEVICE` ou uma palavra de tipo. Nesses dois casos a
 resposta é *"não achei X entre os aparelhos ligados"*, que é a verdade.
@@ -933,7 +933,7 @@ No `raspotify` isso é uma linha em `/etc/raspotify/conf`, confirmada na fonte:
 ```
 
 Comentada, o padrão vira `raspotify (hostname)`. Descomentar com
-`LIBRESPOT_NAME="Marcos"` e `sudo systemctl restart raspotify` faz a Pi entrar na
+`LIBRESPOT_NAME="Ideraldinho"` e `sudo systemctl restart raspotify` faz a Pi entrar na
 lista com esse nome, indistinguível dos outros para a API.
 
 **Consequência de contrato:** `LIBRESPOT_NAME` na Pi e `SPOTIFY_DEVICE` no
@@ -948,9 +948,9 @@ para não ser "otimizado" depois.
 **O que fica para a Fase 6, junto com a Pi:**
 
 - Instalar o raspotify (`curl -sL https://dtcooper.github.io/raspotify/install.sh | sh`)
-  e pôr `LIBRESPOT_NAME="Marcos"` no `/etc/raspotify/conf`. Não roda em ARMv6
+  e pôr `LIBRESPOT_NAME="Ideraldinho"` no `/etc/raspotify/conf`. Não roda em ARMv6
   (Pi 1 e Zero v1); a Pi 5 está muito acima disso.
-- **Ducking**: o `librespot` e o Piper disputam a mesma placa de som. Se o Marcos
+- **Ducking**: o `librespot` e o Piper disputam a mesma placa de som. Se o Ideraldinho
   precisa falar enquanto a música toca, alguém tem que abaixar a música. É o
   mesmo problema do barge-in da Fase 7 (interromper o assistente falando), e
   resolver os dois juntos é mais barato que separado.
@@ -1298,3 +1298,48 @@ medição disse não — que é exatamente para isso que se mede antes.
 **Revisar esta decisão quando:** houver log de uso real com uma pergunta que o
 trecho não respondeu. Aí a comparação se repete com perguntas de verdade, e não
 com quatro que eu escolhi — que é a fraqueza óbvia da medição acima.
+
+---
+
+## D29 — O assistente passa a se chamar Ideraldinho
+
+**Data:** 2026-09-03
+**Substitui:** [D8](#d8--o-assistente-se-chama-marcos), que fica no documento
+como está. Ela é o registro de uma decisão que foi tomada, não uma afirmação
+sobre o presente — reescrevê-la apagaria o motivo pelo qual esta existe.
+
+**O que mudou:** `Marcos` → `Ideraldinho` em todo o código, nos loggers
+(`ideraldinho.*`), no `device_id` (`ideraldinho-01`), no system prompt, no título
+do rosto, no `SPOTIFY_DEVICE` e nos testes. 27 arquivos, 238 testes passando
+depois.
+
+**Por quê:** o aparelho é uma cópia do dono da voz — o TTS é um fine-tune da voz
+dele (D4), e o assistente responde com ela. "Marcos" era o nome do repositório e
+nada mais; foi escolhido em D8 por alinhamento, não por significado. Um
+diminutivo do próprio nome diz o que a coisa é.
+
+**E ele é um wake word melhor.** Cinco sílabas e uma palavra que não existe em
+mais nada: as duas coisas que separam um wake word de um gerador de falso
+positivo. "Marcos" é curto e comum em conversa — o pior formato possível para
+uma palavra que fica escutando a sala o dia inteiro. Isto não é justificativa
+inventada depois: é a razão pela qual a troca aconteceu **antes** de treinar o
+modelo, e não depois.
+
+**A D8 previu o custo desta decisão, e acertou:** *"renomear agora custa uma
+varredura; depois de o nome aparecer em logs, configurações e gravações, custa
+mais."* Custou mais — mas ainda antes das gravações do wake word, que é onde
+teria ficado caro de verdade.
+
+**Consequências:**
+- **`SPOTIFY_DEVICE` mudou de padrão.** Ele tem que ser a mesma string do
+  `LIBRESPOT_NAME` no `/etc/raspotify/conf` da Pi (D23) — é o único fio ligando
+  os dois. Quando a Pi existir, é `LIBRESPOT_NAME="Ideraldinho"`.
+- Um `.env` antigo com `SPOTIFY_DEVICE=Marcos` continua funcionando; só deixa de
+  casar com o aparelho quando a Pi se anunciar pelo nome novo.
+- O `DEVICE_ID` mudou de padrão de novo. Continua sendo só um identificador.
+- O repositório no GitHub continua `Marcos-AI`, e a URL dentro do `USER_AGENT`
+  aponta para ele — renomear ali é ação de fora do código, e uma URL que não
+  resolve seria pior que um nome velho.
+- O **diário fica como foi escrito** onde ele narra o dia 1 escolhendo o nome
+  Marcos. Aquilo aconteceu. O resto do diário, que fala no presente, virou
+  Ideraldinho.

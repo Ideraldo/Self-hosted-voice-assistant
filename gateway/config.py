@@ -33,10 +33,10 @@ class GatewayConfig:
     spotify_market: str = os.getenv("SPOTIFY_MARKET", "BR")
     # Onde tocar quando ninguem disser onde. O padrao aponta para a propria Pi
     # rodando raspotify/librespot: e o que faz "toca Chico Buarque" sair no
-    # alto-falante do Marcos, como sairia numa Alexa, em vez de num PC que pode
+    # alto-falante do Ideraldinho, como sairia numa Alexa, em vez de num PC que pode
     # estar em outro comodo. Enquanto a Pi nao existe, o nome nao casa com nada
     # e a escolha cai para o aparelho ativo, como antes.
-    spotify_device: str = os.getenv("SPOTIFY_DEVICE", "Marcos")
+    spotify_device: str = os.getenv("SPOTIFY_DEVICE", "Ideraldinho")
     # Busca na internet. O padrao nao exige chave nem conta: e a resposta a um
     # modelo de 8B que alucina (D20), e cobrar cadastro para isso funcionar
     # seria trocar um problema por outro. `brave` existe para quem quiser

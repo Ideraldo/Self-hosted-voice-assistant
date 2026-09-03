@@ -23,7 +23,7 @@ import numpy as np
 
 from common.messages import CHANNELS, SAMPLE_RATE
 
-log = logging.getLogger("marcos.capture")
+log = logging.getLogger("ideraldinho.capture")
 
 #: 10, 20 ou 30 ms é tudo que o webrtcvad aceita. 30 ms é o mais barato.
 FRAME_MS = 30
@@ -88,7 +88,7 @@ class Microphone:
         return bytes(frame)
 
     def _flush(self) -> None:
-        """Descarta o que entrou enquanto o Marcos falava.
+        """Descarta o que entrou enquanto o Ideraldinho falava.
 
         Sem isso, a própria resposta dele volta pelo microfone e vira a próxima
         pergunta. Barge-in de verdade vai querer esse áudio; hoje ele só atrapalha.

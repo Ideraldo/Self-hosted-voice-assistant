@@ -22,7 +22,7 @@ from typing import Awaitable, Callable
 
 from device.local.store import Schedule, ScheduleStore
 
-log = logging.getLogger("marcos.scheduler")
+log = logging.getLogger("ideraldinho.scheduler")
 
 #: Teto de cada soneca. Sem isso, um agendamento para daqui a 8 horas viraria um
 #: `sleep(28800)` que não percebe o relógio sendo corrigido no meio.

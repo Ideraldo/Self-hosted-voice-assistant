@@ -1,4 +1,4 @@
-# Marcos-AI — portable voice assistant
+# Ideraldinho-AI — portable voice assistant
 
 Client-server voice assistant, built to replace a bedroom Alexa without giving
 up portability.
@@ -139,9 +139,9 @@ LLM. Anything it does not recognise goes up to the gateway (D17).
 ```
 ```
 gateway: fora do ar -- timer, alarme e hora continuam
-voce:   marcos> Sao 20 horas e 2 minutos.   [nivel 0, local]
-voce:   marcos> Timer de 5 segundos.        [nivel 0, local]
-  marcos> Seu timer acabou.                 [timer]
+voce:   ideraldinho> Sao 20 horas e 2 minutos.   [nivel 0, local]
+voce:   ideraldinho> Timer de 5 segundos.        [nivel 0, local]
+  ideraldinho> Seu timer acabou.                 [timer]
 ```
 
 Schedules live in SQLite (`SCHEDULES_DB`) because an alarm has to survive the
@@ -170,7 +170,7 @@ the LLM end up identical (D18).
 ```
 voce> me lembra de tirar o bolo quando der uma hora e meia
   [ferramenta criar_timer {'segundos': '5400'}]
-marcos> Timer de 1 hora e meia.
+ideraldinho> Timer de 1 hora e meia.
 ```
 
 A device tool's result **is** the answer: it is spoken as returned, with no
@@ -219,7 +219,7 @@ instead is admit it cannot:
 
 ```
 voce> toca chico buarque
-marcos> Nao sei tocar Chico Buarque.
+ideraldinho> Nao sei tocar Chico Buarque.
         Posso ajudar com timers, alarmes ou listar/agendar coisas?
 ```
 
@@ -238,11 +238,11 @@ voce> pula essa                         -> Proxima.
 voce> pausa a musica                    -> Pausado.
 ```
 
-**Where the music plays.** `SPOTIFY_DEVICE` (default `Marcos`) names the device
+**Where the music plays.** `SPOTIFY_DEVICE` (default `Ideraldinho`) names the device
 to use when nobody says where. The order is: the device named in the sentence ->
 this preferred one -> whatever is already active -> the first in the list. It
 points at the Pi on purpose: with `raspotify` (a `librespot` package) announcing
-itself as "Marcos", asking for a song plays it on the assistant's own speaker
+itself as "Ideraldinho", asking for a song plays it on the assistant's own speaker
 rather than on a PC in another room -- which is the difference between being the
 speaker and being a remote control for one (D23). Until the Pi exists the name
 matches nothing and the fallback keeps today's behaviour. `listar_aparelhos` and

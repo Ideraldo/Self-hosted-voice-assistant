@@ -19,7 +19,7 @@ import numpy as np
 
 from common.messages import SAMPLE_RATE
 
-log = logging.getLogger("marcos.stt")
+log = logging.getLogger("ideraldinho.stt")
 
 
 class FasterWhisperSTT:

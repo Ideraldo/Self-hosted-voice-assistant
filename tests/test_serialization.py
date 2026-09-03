@@ -13,7 +13,7 @@ from common.serialization import decode, encode
 @pytest.mark.parametrize(
     "message",
     [
-        SessionStart(device_id="marcos-01", token="t"),
+        SessionStart(device_id="ideraldinho-01", token="t"),
         Utterance(text="que horas sao?"),
         StateMessage(value=State.THINKING),
         Transcript(text="que horas sao?", role="user"),

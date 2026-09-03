@@ -27,7 +27,7 @@ from websockets.http11 import Request, Response
 
 from common.messages import Emotion, State
 
-log = logging.getLogger("marcos.rosto")
+log = logging.getLogger("ideraldinho.rosto")
 
 STATIC = Path(__file__).parent / "static"
 

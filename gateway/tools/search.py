@@ -30,7 +30,7 @@ import httpx
 
 from gateway.llm.base import Tool
 
-log = logging.getLogger("marcos.busca")
+log = logging.getLogger("ideraldinho.busca")
 
 #: Quantos resultados pedir. Cinco é o suficiente para o modelo cruzar duas
 #: fontes e pouco o bastante para não inchar o prompt -- e prompt inchado, num
@@ -45,7 +45,7 @@ RESULTADOS = 5
 #: Wikimedia pede de quem chega pela API.
 #: A URL nao e enfeite: sem um contato aqui dentro, a API da Wikimedia devolve
 #: 403 -- medido, o mesmo pedido passou a 200 so de acrescenta-la.
-USER_AGENT = "MarcosAssistente/0.1 (+https://github.com/Ideraldo/Marcos-AI)"
+USER_AGENT = "IderaldinhoAssistente/0.1 (+https://github.com/Ideraldo/Marcos-AI)"
 
 #: A Wikipedia responde 403 a leitura direta de `/wiki/...` -- com qualquer
 #: User-Agent, medido -- e no corpo do erro manda usar a API. E o que fazemos:

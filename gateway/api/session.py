@@ -41,7 +41,7 @@ from gateway.tools import (
     executar_spotify,
 )
 
-log = logging.getLogger("marcos.session")
+log = logging.getLogger("ideraldinho.session")
 
 #: Sentence enders that are safe places to start speaking (plan section 11:
 #: streaming TTS is one of the two biggest latency wins).

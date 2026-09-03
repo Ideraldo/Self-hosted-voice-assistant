@@ -25,7 +25,7 @@ from common.messages import Error, SessionStart, State, StateMessage, Utterance
 from common.serialization import decode, encode
 from device.config import config
 
-log = logging.getLogger("marcos.ws")
+log = logging.getLogger("ideraldinho.ws")
 
 #: Espera entre tentativas: dobra a cada falha, até o teto. O primeiro passo é
 #: curto porque a queda mais comum é o gateway reiniciando, e ele volta em

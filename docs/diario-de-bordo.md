@@ -1,6 +1,6 @@
 # Diário de bordo
 
-Registro narrativo do desenvolvimento do Marcos-AI: as dúvidas, as decisões, o
+Registro narrativo do desenvolvimento do Ideraldinho-AI: as dúvidas, as decisões, o
 que foi tentado e o que deu errado. Material para o vídeo de documentação do
 projeto.
 
@@ -772,7 +772,7 @@ que ninguém nunca gravou.
 
 ---
 
-## Dia 4 (continuação) — O Marcos ganhou voz, e a régua estava torta
+## Dia 4 (continuação) — O Ideraldinho ganhou voz, e a régua estava torta
 
 O dia que começou com um treino morto terminou com o assistente falando comigo
 com a minha própria voz. No meio, a ferramenta de medição me enganou pela
@@ -789,7 +789,7 @@ dia eu gravar mais frases, a lista se ajusta sozinha.
 
 ### O assistente fala
 
-Esse foi o marco do dia. Até então o Marcos respondia por texto na tela; agora
+Esse foi o marco do dia. Até então o Ideraldinho respondia por texto na tela; agora
 responde **falando, com a voz treinada**.
 
 O desenho segue a decisão D1: o gateway manda a resposta **frase por frase**,
@@ -818,7 +818,7 @@ e funcionou:
 
 ```
 voce: oi, quem e voce? responda em uma frase curta
-  marcos> Sou o BMO, o assistente de voz pessoal, aqui para ajudar...
+  ideraldinho> Sou o BMO, o assistente de voz pessoal, aqui para ajudar...
 ```
 
 Funcionou — e **matou o treino**. Uns minutos depois, `CUDA error: out of
@@ -843,6 +843,9 @@ aquele número era CPU, com a GPU ocupada.
 Foi ouvindo isso que decidi o nome. O repositório se chama Marcos-AI e o código
 ainda dizia BMO, herdado do plano. Renomeado: `device_id`, loggers, e o system
 prompt.
+
+*(Nota do dia 8: virou **Ideraldinho** — D29. Esta entrada fica como foi escrita;
+o dia 1 aconteceu assim.)*
 
 Junto vieram três decisões que estavam paradas: **STT começa pelo mais rápido** e
 troca se doer; **sem VPS por enquanto**, porque nada do que falta depende dela; e
@@ -901,7 +904,7 @@ A prova de que funcionou está na coluna da base, que antes oscilava entre 14,6%
 **A época final ganha nos dois critérios.** O oposto do que eu tinha dito vinte
 minutos antes. Treinar até o fim valeu.
 
-Ela virou a voz oficial do Marcos. Meu veredito ouvindo: *não ficou perfeito, mas
+Ela virou a voz oficial do Ideraldinho. Meu veredito ouvindo: *não ficou perfeito, mas
 está convincente*.
 
 *Terceira vez que a medição erra antes do modelo: no Dia 3 ela mandou parar um
@@ -922,7 +925,7 @@ treino saudável, de manhã contava "18h45" como erro, e agora condenou a melhor
 
 ## Dia 5 — O microfone entrou no fio, e o fio aprendeu a cair
 
-Hoje foi o dia em que o Marcos deixou de depender de mim digitando.
+Hoje foi o dia em que o Ideraldinho deixou de depender de mim digitando.
 
 O stub de STT no gateway morreu. `device/audio/capture.py` grava, o VAD corta a
 fala, `device/stt/faster_whisper.py` transcreve, e o que sobe pela rede é uma
@@ -1183,7 +1186,7 @@ quando ela te contraria.
 disparava certo. Os testes dos dois passavam. E mesmo assim:
 
 ```
-voce:   marcos> Timer de 5 segundos.   [nivel 0, local]
+voce:   ideraldinho> Timer de 5 segundos.   [nivel 0, local]
 voce: (silêncio)
 ```
 
@@ -1214,14 +1217,14 @@ para o TTS não é o texto que se escreve.
 Gateway desligado, do começo ao fim:
 
 ```
-marcos.ws gateway fora do ar; subindo em modo local
+ideraldinho.ws gateway fora do ar; subindo em modo local
 gateway: fora do ar -- timer, alarme e hora continuam
 
-voce:   marcos> Sao 20 horas e 2 minutos.   [nivel 0, local]
-voce:   marcos> Timer de 5 segundos.        [nivel 0, local]
+voce:   ideraldinho> Sao 20 horas e 2 minutos.   [nivel 0, local]
+voce:   ideraldinho> Timer de 5 segundos.        [nivel 0, local]
 voce:
-  marcos> Seu timer acabou.                 [timer]
-  marcos> Nao tem nada marcado.             [nivel 0, local]
+  ideraldinho> Seu timer acabou.                 [timer]
+  ideraldinho> Nao tem nada marcado.             [nivel 0, local]
 ```
 
 O timer tocou sozinho, cinco segundos depois, sem nenhum servidor no ar. Esse é
@@ -1300,9 +1303,9 @@ Minha primeira reação foi consertar pelo prompt: *"repita o resultado sem omit
 nenhum item"*. Ficou pior — o modelo passou a narrar:
 
 ```
-marcos> Eu não tenho acesso direto à sua agenda, mas posso chamar a
+ideraldinho> Eu não tenho acesso direto à sua agenda, mas posso chamar a
         ferramenta "listar_agendamentos" para obter mais informações.
-marcos> Chame a ferramenta "listar_agendamentos".
+ideraldinho> Chame a ferramenta "listar_agendamentos".
 ```
 
 Aí caiu a ficha de que a abordagem estava errada, não a redação. **A resposta do
@@ -1330,7 +1333,7 @@ No fim, quase de passagem, perguntei uma coisa boba:
 
 ```
 voce> qual a capital da australia
-marcos> Não sei.
+ideraldinho> Não sei.
 ```
 
 O llama3.1:8b sabe que é Canberra. Testei isolando:
@@ -1413,7 +1416,7 @@ raciocínio, ligado por padrão no qwen3. Desliguei com `think: false`, o tempo
 caiu pela metade — e apareceu isto:
 
 ```
-marcos> Okay, the user is asking for the capital of Australia...
+ideraldinho> Okay, the user is asking for the capital of Australia...
 ```
 
 O rascunho do raciocínio voltou como **conteúdo**, não como campo separado. Num
@@ -1446,10 +1449,10 @@ Com tudo no lugar, o turno completo:
 
 ```
 voce> qual a capital da australia
-marcos> Canberra.                                        (1,2 s)
+ideraldinho> Canberra.                                        (1,2 s)
 
 voce> quem escreveu dom casmurro
-marcos> Mario Quintana.
+ideraldinho> Mario Quintana.
 ```
 
 Machado de Assis. Ele errou com confiança total, que é o pior jeito de errar.
@@ -1563,14 +1566,14 @@ tenta usar mesmo assim. Com o Spotify desligado:
 
 ```
 voce> poe um timer de 10 minutos
-marcos> Timer de 10 minutos.        [nivel 0, local]
+ideraldinho> Timer de 10 minutos.        [nivel 0, local]
 
 voce> toca chico buarque
-marcos> Nao sei tocar Chico Buarque.
+ideraldinho> Nao sei tocar Chico Buarque.
         Posso ajudar com timers, alarmes ou listar/agendar coisas?
 
 voce> qual a capital da australia
-marcos> A capital da Australia e Canberra.
+ideraldinho> A capital da Australia e Canberra.
 ```
 
 Ele diz que não sabe, oferece o que sabe, e não inventa chamada nenhuma. É o
@@ -1614,7 +1617,7 @@ aparelhos: [('RUIPC', 'Computer', False),
             ('Echo Dot de Ideraldo', 'Speaker', False)]
 ```
 
-**O Echo Dot que eu quero aposentar é um dos aparelhos que o Marcos pode
+**O Echo Dot que eu quero aposentar é um dos aparelhos que o Ideraldinho pode
 comandar.** Vou usar isso no vídeo.
 
 ### O 403 que significava outra coisa
@@ -1652,7 +1655,7 @@ Aí veio a parte que me incomodou de verdade. Pelo caminho de voz completo:
 
 ```
 voce> pausa a musica
-marcos> Pausando a musica.
+ideraldinho> Pausando a musica.
 ```
 
 Fui conferir o player: `is_playing = True`. **Ele disse que pausou e não pausou.**
@@ -1719,14 +1722,14 @@ uma explicação bonita e errada.**
 teste pegaria isso — todos os 158 passavam. O que pegou foi eu perguntar ao
 Spotify se ele estava tocando.*
 
-### E se tocasse no próprio Marcos?
+### E se tocasse no próprio Ideraldinho?
 
 Perguntei se não dava para a música sair do próprio aparelho, como a Alexa faz.
 Dá — e a resposta estava na lista de aparelhos que eu já tinha visto: para o
 Spotify, a Alexa **é** um Connect device. Na Pi o equivalente é o `raspotify`,
 empacotamento do `librespot`, que se anuncia com o nome que você der.
 
-Então o padrão passou a ser `SPOTIFY_DEVICE=Marcos` ([D23](decisions.md)): pedir
+Então o padrão passou a ser `SPOTIFY_DEVICE=Ideraldinho` ([D23](decisions.md)): pedir
 música sem dizer onde toca na Pi. Enquanto a Pi não existe, o nome não casa com
 nada e cai para o aparelho ativo — que é o comportamento de antes, e foi assim
 que ficou aqui.
@@ -1778,9 +1781,9 @@ celular". A primeira tentativa mandou "celular" para dentro da busca e tocou a
 (`Smartphone`, `Speaker`, `Computer`), então virou uma tabela de como as pessoas
 chamam cada tipo.
 
-**E aí eu quebrei a correção anterior.** Pedi para tocar no `"marcos"` — a Pi,
+**E aí eu quebrei a correção anterior.** Pedi para tocar no `"ideraldinho"` — a Pi,
 que não existe ainda. A regra "se não é aparelho, joga na busca" transformou isso
-numa busca por "Construção Marcos" e tocou, de novo, outra gravação. Sem avisar
+numa busca por "Construção Ideraldinho" e tocou, de novo, outra gravação. Sem avisar
 nada.
 
 Ou seja: eu tinha trocado um erro silencioso por outro erro silencioso. A saída
@@ -1789,19 +1792,19 @@ busca se **não parecer** aparelho, e parece quando é o nome configurado em
 `SPOTIFY_DEVICE` ou uma palavra de tipo:
 
 ```
-pedindo 'marcos'  -> Nao achei marcos entre os aparelhos ligados.
+pedindo 'ideraldinho'  -> Nao achei ideraldinho entre os aparelhos ligados.
 pedindo 'tv'      -> Nao achei tv entre os aparelhos ligados.
 split do artista  -> Tocando Construcao, de Chico Buarque.
 ```
 
-**O "toca direto no Marcos" ainda não existe**, e é bom deixar isso claro: não é
+**O "toca direto no Ideraldinho" ainda não existe**, e é bom deixar isso claro: não é
 bug, é hardware. Não há Pi, logo não há raspotify, logo não há aparelho chamado
-Marcos. O que dá para afirmar hoje é que o caminho até ele está pronto e testado
+Ideraldinho. O que dá para afirmar hoje é que o caminho até ele está pronto e testado
 — o dia em que a Pi anunciar esse nome, ela entra na lista como qualquer outro
 aparelho e vira o padrão sozinha.
 
 Fica anotado para a Fase 6, junto com a Pi: instalar o raspotify, e resolver o
-**ducking** — o `librespot` e o Piper disputam a mesma placa de som, e se o Marcos
+**ducking** — o `librespot` e o Piper disputam a mesma placa de som, e se o Ideraldinho
 precisa falar enquanto a música toca, alguém tem que abaixar. É o mesmo problema
 do barge-in da Fase 7, e sai mais barato resolver os dois de uma vez.
 
@@ -1846,8 +1849,8 @@ tipos.
 ### O bug que só a busca conseguia revelar
 
 ```
-marcos> A distância média entre a Terra e a Lua é de aproximadamente 384.
-marcos> 400 quilômetros.
+ideraldinho> A distância média entre a Terra e a Lua é de aproximadamente 384.
+ideraldinho> 400 quilômetros.
 ```
 
 O gateway quebra frase em todo `.` desde o dia 2 — é o que faz o dispositivo
@@ -1930,11 +1933,11 @@ bug no despertador — havia um teste que só era verdade de manhã.*
 
 ## Onde estamos agora
 
-**O Marcos me ouve, pensa, responde com a minha voz — e agora também resolve
+**O Ideraldinho me ouve, pensa, responde com a minha voz — e agora também resolve
 sozinho o que não precisa de ninguém.** Timer, alarme e hora funcionam com o
 gateway desligado e com a internet fora.
 
-**O Marcos me ouve, pensa e responde com a minha voz — sem eu digitar nada.** O
+**O Ideraldinho me ouve, pensa e responde com a minha voz — sem eu digitar nada.** O
 microfone captura, o VAD corta, o faster-whisper transcreve no próprio
 dispositivo, o gateway consulta o LLM e devolve a resposta frase por frase, e o
 Piper sintetiza. Pela rede sobe e desce só texto. E se o fio cair no meio, o
@@ -1947,7 +1950,7 @@ Fechado até aqui:
 
 | | Escolha | Por quê |
 |---|---|---|
-| Nome | Marcos (D8) | o repositório já se chamava assim |
+| Nome | Ideraldinho (D8, D29) | é uma cópia do dono da voz |
 | Arquitetura | Dois processos, WebSocket | migrar = trocar URL |
 | Rede | só texto, nos dois sentidos (D7, D13) | alguns KB por interação, e fala offline |
 | LLM | qwen3:8b via Ollama, sem raciocínio (D11, D20) | o llama3.1 não tem ferramentas e conhecimento juntos |
@@ -2075,7 +2078,7 @@ qual decisão explica o porquê.
 - [ ] **Instalar o raspotify** e dar o nome à Pi:
       ```bash
       curl -sL https://dtcooper.github.io/raspotify/install.sh | sh
-      sudo nano /etc/raspotify/conf     # LIBRESPOT_NAME="Marcos"
+      sudo nano /etc/raspotify/conf     # LIBRESPOT_NAME="Ideraldinho"
       sudo systemctl restart raspotify
       ```
       `LIBRESPOT_NAME` tem que ser **a mesma string** do `SPOTIFY_DEVICE` no
