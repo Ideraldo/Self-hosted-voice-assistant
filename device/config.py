@@ -30,6 +30,15 @@ class DeviceConfig:
     input_device: str | int | None = _audio_device("AUDIO_INPUT_DEVICE")
     output_device: str | int | None = _audio_device("AUDIO_OUTPUT_DEVICE")
     display_mode: str = os.getenv("DISPLAY_MODE", "window")  # window | kiosk
+    # O rosto (Fase 4). Porta separada da do gateway porque os dois processos
+    # podem estar na mesma maquina, e porque na Pi o gateway nem existe.
+    # Escutar so em 127.0.0.1 e decisao do servidor: a tela e local, e uma porta
+    # aberta na rede de casa mostrando o estado do microfone nao paga nada.
+    face_port: int = int(os.getenv("FACE_PORT", "8080"))
+    face_enabled: bool = os.getenv("FACE_ENABLED", "1").strip().lower() not in {"0", "false", ""}
+    # Qual rosto: "minimo" (dois retangulos) ou "anime". E so a camada de
+    # desenho -- os dois falam o mesmo {state, emotion} (D27).
+    face_theme: str = os.getenv("FACE_THEME", "minimo")
     # A voz do assistente. Fica fora do pacote de proposito: no PC ela vem da
     # bancada, na Pi virá de um diretório próprio, e nenhum dos dois deveria
     # estar escrito no código.

@@ -20,9 +20,9 @@ device/      runs on the PC now, on a Pi 5 later
   local/         timers, alarms, the clock -- SQLite + scheduler, no network
   stt/           faster-whisper: transcription happens before the wire (D1)
   tts/          Piper: the assistant's own voice, synthesised locally
-  face/          web app served locally, state over WS
+  rosto/         the face: web app served locally, state over WS (D27)
   ws_client.py   the single connection to the gateway
-  state.py       state machine
+  state.py       state machine + the observer hook the face subscribes to
 gateway/     runs with uvicorn today, in Docker on a VPS later
   api/           WebSocket, token auth, the turn loop
   llm/           interface + swappable implementations
@@ -33,6 +33,7 @@ gateway/     runs with uvicorn today, in Docker on a VPS later
   data/          the Spotify refresh token -- gitignored
   Dockerfile     gateway-only image; see requirements-gateway.txt (D15)
 common/      shared message schemas -- the contract, never logic
+scripts/     dev tools; scripts/rosto.py drives the face without a microphone
 lab/         bench for picking the STT and TTS engines (not production)
 docs/        the plan, the structure guide, the decision log, the diary
 .claude/     project skills: /documentar closes a work session
@@ -273,6 +274,65 @@ Home Assistant is out of scope -- one smart bulb does not justify Tailscale and
 phase 5: a single smart bulb does not pay for a Home Assistant instance and a
 Tailscale link to reach it.
 
+## Phase 4 -- the face
+
+Four animated states -- idle, listening, thinking, speaking -- as a local web
+page. It comes up with the device; no extra process to start.
+
+```powershell
+.\.venv\Scripts\python.exe -m device.main --text --rosto   # opens the browser too
+```
+
+The URL is printed on boot (`http://127.0.0.1:8080/` by default). Two query
+params help while designing:
+
+- `?debug` prints the current state and emotion at the bottom of the screen
+- `?demo` cycles every state and emotion with no device running
+
+To iterate on the face without loading Whisper and speaking a sentence for every
+CSS tweak, drive it from the keyboard:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.rosto
+> listening
+> happy
+```
+
+| Variable | Default | What it does |
+|---|---|---|
+| `FACE_PORT` | `8080` | port for the page and its WebSocket (same port) |
+| `FACE_ENABLED` | `1` | `0` boots the device with no face at all |
+| `FACE_THEME` | `minimo` | which face `/` serves: `minimo` or `anime` |
+| `DISPLAY_MODE` | `window` | `kiosk` on the Pi, once there is a Pi |
+
+**Two faces, one protocol.** `minimo` is two rounded rectangles; `anime` is
+almond eyes with iris, lashes, brows and a mouth. Both are served by the same
+server, driven by the same `face.js`, and fed the same `{state, emotion}` --
+the theme is the drawing layer and nothing else. Either file is always reachable
+by name (`/minimo.html`, `/anime.html`), so comparing them takes no restart.
+
+**Why a web app, and what it costs** (D27): the screen will not stay a face --
+transcript, a running timer, album art -- and that is interface, where HTML is
+cheap and a canvas is not. The cost is a browser competing for the same four
+cores as `faster-whisper`. The mitigation is a rule, not a hope: **only
+`transform` and `opacity` animate**, so the work stays on the GPU. No `<canvas>`,
+no `requestAnimationFrame`.
+
+The face is a subscriber to `StateMachine.transition()`, which is what makes the
+renderer swappable: replacing Chromium with a native app later rewrites one
+subscriber, not the architecture. And it can never take the device down -- a
+subscriber that raises becomes a log line, a server that cannot bind returns
+`False` and the turn goes on. The screen is a showcase; the timer is a function.
+
+**Emotion is a second axis, not a fifth state.** `Emotion` is declared in the
+protocol as an optional field and nothing sends it yet: fitting a new axis into
+the wire format later is expensive, an empty optional field is not.
+
+**The acceptance criterion changed.** "Does not stutter during audio" measures
+nothing -- the face can be smooth and still steal the STT's core. It is now
+**the face must not make the STT's RTF worse**, measured on the Pi, page open vs.
+page closed. Nothing here has been measured on a Pi: there is no Pi yet.
+
 ## Choosing STT and TTS
 
 `lab/` is where engines are measured before becoming an implementation under
@@ -301,10 +361,11 @@ in `docs/voz-e-locutor.md`:
 **Phase 1's container is written but never executed** (D15), and its first real
 run will be on the VPS (D16). Nothing else waits on it.
 
-**Phase 4 -- the face**: a local web app with the four animated states. Does not
-depend on hardware.
+**Phase 4 is up on the PC** -- the four states animate and the browser follows
+the real state machine. What is left for it is the Pi: kiosk mode, and the RTF
+measurement that is now its acceptance criterion (D27).
 
-**Portable translator mode**, the other candidate for next. Speak Portuguese,
+**Portable translator mode** is the next marker. Speak Portuguese,
 have the device speak English or Chinese, and the reverse. Two of the three pieces already exist --
 Whisper is multilingual by nature, Piper has a voice per language -- so what is
 missing is machine translation in the middle. The candidate is **opus-mt on

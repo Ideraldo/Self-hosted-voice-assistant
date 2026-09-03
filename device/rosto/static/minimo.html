@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Marcos</title>
+<link rel="stylesheet" href="face.css">
+</head>
+<body>
+<!--
+  Os olhos são dois retângulos arredondados, e isso é uma decisão, não preguiça.
+  Íris e pupila pedem detalhe que só some a um metro de distância, que é onde
+  esta tela vai ficar; uma forma sólida que se deforma lê de longe e custa duas
+  propriedades animáveis. Toda a expressão sai de `transform` -- escala,
+  translação, rotação -- porque essas o compositor resolve na GPU. Nada aqui
+  usa canvas nem requestAnimationFrame: os quatro núcleos da Pi são do Whisper.
+-->
+<div id="rosto" class="rosto" data-state="idle" data-emotion="neutral" data-conexao="offline">
+  <svg class="face" viewBox="0 0 800 400" aria-hidden="true">
+    <defs>
+      <!--
+        A pálpebra. Ela é um recorte, e não um retângulo da cor do fundo por
+        cima: o recorte acontece antes do `drop-shadow`, então o brilho segue a
+        forma cortada. Tapando com um retângulo, o brilho da parte escondida
+        continuaria vazando por fora dela.
+
+        Parada em y=0 ela não corta nada. Descendo, sobra só a metade de baixo
+        do olho -- e a metade de baixo de um retângulo arredondado é a curva ∪
+        que a gente lê como sorriso. Foi o que faltou na primeira versão: só
+        achatar o olho não dá alegria, dá sono.
+      -->
+      <clipPath id="palpebra" clipPathUnits="userSpaceOnUse">
+        <rect class="palpebra" x="0" y="0" width="800" height="400" />
+      </clipPath>
+    </defs>
+    <!--
+      O recorte fica no `rect` e o brilho no `g` de fora. A ordem importa e
+      custou uma tentativa: com os dois no mesmo elemento, o SVG aplica o filtro
+      antes do recorte, e o corte atravessava o halo deixando uma emenda reta de
+      ponta a ponta da tela. Recortando a forma primeiro, o brilho nasce já da
+      forma cortada e acompanha a curva.
+    -->
+    <g class="tilt">
+      <g class="eye eye--left">
+        <rect x="180" y="120" width="140" height="160" rx="46" clip-path="url(#palpebra)" />
+      </g>
+      <g class="eye eye--right">
+        <rect x="480" y="120" width="140" height="160" rx="46" clip-path="url(#palpebra)" />
+      </g>
+    </g>
+  </svg>
+  <p class="legenda" id="legenda"></p>
+</div>
+<script src="face.js"></script>
+</body>
+</html>

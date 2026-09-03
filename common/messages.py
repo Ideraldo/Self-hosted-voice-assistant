@@ -28,6 +28,26 @@ class State(str, Enum):
     SPEAKING = "speaking"
 
 
+class Emotion(str, Enum):
+    """O segundo eixo do rosto, e é de propósito que ele não é um estado.
+
+    `State` é sobre o ciclo do turno: `SPEAKING` é `SPEAKING` tanto para "sao
+    tres da tarde" quanto para uma piada. O humor é ortogonal a isso -- o mesmo
+    estado pode ser dito de vários jeitos -- e quem sabe qual é ele é o gateway,
+    que viu o conteúdo da resposta; o dispositivo só o repassa para a tela.
+
+    Fica declarado agora porque encaixar um eixo novo no protocolo depois é
+    caro, e porque um campo opcional não custa nada enquanto ninguém o preenche.
+    Nenhuma parte do gateway o envia ainda: hoje o rosto é sempre NEUTRAL.
+    """
+
+    NEUTRAL = "neutral"
+    HAPPY = "happy"
+    CURIOUS = "curious"
+    CONFUSED = "confused"
+    SORRY = "sorry"
+
+
 # ---------- device -> gateway ----------
 
 
@@ -73,12 +93,17 @@ class ToolResult:
 @dataclass
 class StateMessage:
     value: State
+    #: Opcional: ausente quer dizer "não mudou", e não "neutro". Quem não manda
+    #: nada deixa o rosto como está, que é o que todo o gateway faz hoje.
+    emotion: Emotion | None = None
     type: Literal["state"] = "state"
 
     def __post_init__(self) -> None:
         # Arrives off the wire as a plain string; the rest of the code compares
         # against the enum, so normalise once, here.
         self.value = State(self.value)
+        if self.emotion is not None:
+            self.emotion = Emotion(self.emotion)
 
 
 @dataclass

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Marcos</title>
+<link rel="stylesheet" href="anime.css">
+</head>
+<body>
+<!--
+  O rosto de anime. Mesmo protocolo do tema mínimo -- `{state, emotion}` e o
+  mesmo face.js -- e é esse o ponto: trocar de rosto é trocar a camada de
+  desenho, não a arquitetura (D27).
+
+  Esta é a terceira geometria. As duas primeiras erraram a mesma coisa por
+  motivos diferentes, e vale registrar porque o erro não é óbvio:
+
+  1. O cílio era uma curva própria, mais baixa que o olho, e cortava o globo ao
+     meio. Cara de sapo.
+  2. Corrigido para acompanhar a borda de cima, mas com uma parábola mais
+     estreita que a elipse: virou um ovo pontudo.
+
+  O que faltava nas duas não era a curva, era a **anatomia**. Um olho de anime
+  não é uma elipse com um traço em cima. Ele é:
+
+  - uma amêndoa ASSIMÉTRICA -- canto externo mais alto que o interno;
+  - com a íris ALTA E CORTADA pela pálpebra: ela transborda por cima e por
+    baixo do buraco do olho, e é o recorte que dá a forma. Íris inteira e
+    visível dentro do branco lê como olho de desenho infantil;
+  - com o branco aparecendo só nos CANTOS, quase nada;
+  - com a íris escura EM CIMA (sombra da pálpebra) e clara embaixo. Ao
+    contrário disso, ela fica com aparência de bola de gude.
+-->
+<div id="rosto" class="rosto" data-state="idle" data-emotion="neutral" data-conexao="offline">
+  <svg class="face" viewBox="0 0 800 420" aria-hidden="true">
+    <defs>
+      <!-- Escuro em cima: é a sombra que a pálpebra joga dentro do olho. -->
+      <linearGradient id="iris" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#0e3f7d"/>
+        <stop offset="42%"  stop-color="#2ba8e8"/>
+        <stop offset="78%"  stop-color="#7fe4ff"/>
+        <stop offset="100%" stop-color="#cbf5ff"/>
+      </linearGradient>
+      <linearGradient id="branco" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#8fa8ba"/>
+        <stop offset="100%" stop-color="#dbe9f2"/>
+      </linearGradient>
+
+      <!--
+        A pálpebra: um recorte, nunca um retângulo por cima. Descendo, ela fecha
+        o olho; o cílio desce junto e vira a linha do olho fechado. Os dois
+        andam com `transform`, e por isso piscar não custa repintura.
+
+        O recorte tem a MESMA CURVA do cílio, e isso não é capricho. Enquanto
+        ele era um retângulo, o corte era uma reta horizontal e o cílio era um
+        arco: nos cantos do olho sobrava um naco de esclera acima do cílio, com
+        topo reto, que lia como falha de desenho. Com a curva igual, os dois
+        andam juntos e o mesmo `translateY` serve para ambos -- o que também
+        matou a conta de duas escalas diferentes que já tinha me pegado uma vez.
+      -->
+      <clipPath id="palpebra-esq" clipPathUnits="userSpaceOnUse">
+        <path class="palpebra"
+              d="M 150 190 C 158 100 210 68 264 74 C 316 80 342 128 346 196
+                 L 346 420 L 150 420 Z"/>
+      </clipPath>
+      <clipPath id="palpebra-dir" clipPathUnits="userSpaceOnUse">
+        <path class="palpebra"
+              d="M 650 190 C 642 100 590 68 536 74 C 484 80 458 128 454 196
+                 L 454 420 L 650 420 Z"/>
+      </clipPath>
+
+      <!-- O buraco do olho. É ele que corta a íris; sem isso ela vira bola. -->
+      <clipPath id="globo-esq" clipPathUnits="userSpaceOnUse">
+        <path d="M 152 186 C 160 100 210 72 262 78 C 312 84 340 130 344 194 C 336 254 290 284 244 278 C 200 272 162 240 152 186 Z"/>
+      </clipPath>
+      <clipPath id="globo-dir" clipPathUnits="userSpaceOnUse">
+        <path d="M 648 186 C 640 100 590 72 538 78 C 488 84 460 130 456 194 C 464 254 510 284 556 278 C 600 272 638 240 648 186 Z"/>
+      </clipPath>
+    </defs>
+
+    <g class="tilt">
+      <!-- ---------- olho esquerdo (canto externo à esquerda) ---------- -->
+      <g class="eye eye--left">
+        <g clip-path="url(#palpebra-esq)">
+          <path class="branco" d="M 152 186 C 160 100 210 72 262 78 C 312 84 340 130 344 194 C 336 254 290 284 244 278 C 200 272 162 240 152 186 Z"/>
+          <g clip-path="url(#globo-esq)">
+            <g class="iris">
+              <ellipse class="iris-disco" cx="250" cy="188" rx="70" ry="102"/>
+              <ellipse class="pupila" cx="250" cy="190" rx="28" ry="52"/>
+              <circle class="luz luz--grande" cx="218" cy="146" r="22"/>
+              <circle class="luz luz--pequena" cx="282" cy="234" r="11"/>
+            </g>
+          </g>
+          <!-- A pálpebra de baixo saiu daqui. Com a íris grande o suficiente
+               para encostar embaixo, a linha atravessava a íris e lia como
+               risco solto, não como anatomia. A borda do próprio olho já faz
+               esse trabalho. -->
+        </g>
+        <path class="arco" d="M 176 214 Q 250 132 326 214"/>
+        <path class="cilio" d="M 150 190 C 158 100 210 68 264 74 C 316 80 342 128 346 196"/>
+      </g>
+
+      <!-- ---------- olho direito (espelhado) ---------- -->
+      <g class="eye eye--right">
+        <g clip-path="url(#palpebra-dir)">
+          <path class="branco" d="M 648 186 C 640 100 590 72 538 78 C 488 84 460 130 456 194 C 464 254 510 284 556 278 C 600 272 638 240 648 186 Z"/>
+          <g clip-path="url(#globo-dir)">
+            <g class="iris">
+              <ellipse class="iris-disco" cx="550" cy="188" rx="70" ry="102"/>
+              <ellipse class="pupila" cx="550" cy="190" rx="28" ry="52"/>
+              <circle class="luz luz--grande" cx="518" cy="146" r="22"/>
+              <circle class="luz luz--pequena" cx="582" cy="234" r="11"/>
+            </g>
+          </g>
+        </g>
+        <path class="arco" d="M 474 214 Q 550 132 624 214"/>
+        <path class="cilio" d="M 650 190 C 642 100 590 68 536 74 C 484 80 458 128 454 196"/>
+      </g>
+
+      <!-- As sobrancelhas fazem mais pela emoção que os olhos. São elas que
+           separam "curioso" de "confuso" com a íris no mesmo lugar. -->
+      <path class="sobrancelha sobrancelha--esq" d="M 170 62 Q 250 26 330 54"/>
+      <path class="sobrancelha sobrancelha--dir" d="M 470 54 Q 550 26 630 62"/>
+
+      <!-- A boca só se mexe falando, e não em sincronia com a voz: o
+           dispositivo não manda amplitude, e mandar exigiria áudio subindo
+           para a tela a 50 Hz -- exatamente o que a D7 tirou do fio. -->
+      <path class="boca" d="M 374 366 Q 400 384 426 366"/>
+    </g>
+  </svg>
+  <p class="legenda" id="legenda"></p>
+</div>
+<script src="face.js"></script>
+</body>
+</html>

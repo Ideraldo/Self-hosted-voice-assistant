@@ -1122,3 +1122,95 @@ dias assim porque a suíte nunca tinha rodado de madrugada.
   e é o outro lugar onde isso vai doer — ali o problema não é o horário, é o
   relógio da Pi, que pode acordar em 1970 e ser corrigido pelo NTP no meio de
   uma espera.
+
+---
+
+## D27 — O rosto é uma página web, e o renderizador é trocável
+
+**Data:** 2026-09-02
+**O plano diz:** a seção 11 já previa "HTML/CSS/JS em Chromium kiosk, estado via
+WebSocket local", e a seção 5 já abstraía o modo de exibição por variável de
+ambiente. Esta decisão confirma o plano — mas por um motivo diferente do que ele
+dava, e com um limite escrito.
+
+**A dúvida:** um navegador em cima de uma Pi que ainda nem foi medida. O
+Chromium ocioso custa da ordem de centenas de MB de RAM e disputa os mesmos
+quatro núcleos que o `faster-whisper` usa — e o risco não é a página travar, é o
+**RTF do STT piorar** justamente no estado `THINKING`, que é quando o rosto mais
+se mexe. A alternativa séria era `pygame-ce` em SDL2/KMSDRM: sem servidor X, sem
+navegador, dezenas de MB, e o rosto virando parte do processo do dispositivo —
+sumiriam o servidor WebSocket local, o ciclo de vida do navegador, o autostart
+em kiosk e o "quem reinicia o Chromium se ele morrer".
+
+**Por que a página ganhou mesmo assim:** porque a tela não vai ficar só no
+rosto. O próximo uso dela é transcrição, timer correndo, capa do álbum,
+resultado de busca — e isso é **interface**, onde HTML custa uma linha e um
+canvas custa uma tarde. Escolher pygame agora otimizaria o rosto de hoje e
+cobraria caro na tela de amanhã. A economia de CPU é real; ela só não é o eixo
+que decide.
+
+**O que essa escolha compra de volta, e é o essencial:** a fronteira é o gancho
+de observador em `StateMachine.transition()` (`device/state.py`). O rosto é um
+assinante. Trocar o Chromium por um app nativo depois é reescrever um assinante,
+não a arquitetura — o que torna barato *errar* esta decisão.
+
+**Emoção não é estado.** Os quatro estados são o ciclo do turno; `SPEAKING` é
+`SPEAKING` para a hora certa e para uma piada. O humor é um segundo eixo,
+ortogonal, e quem o conhece é o gateway, que viu o conteúdo da resposta. Ficou
+declarado agora (`Emotion`, campo opcional em `StateMessage`) e **ninguém o
+envia ainda**: encaixar um eixo novo no protocolo depois custa caro, e um campo
+opcional não custa nada enquanto está vazio.
+
+**Consequências:**
+- Só `transform` e `opacity` animam. Qualquer outra propriedade força layout ou
+  repintura na CPU, que é a CPU do Whisper. Nada de `<canvas>` nem de
+  `requestAnimationFrame`. É a regra que uma regressão futura vai quebrar sem
+  aparecer em teste nenhum.
+- A tela apaga em `IDLE` — o plano já pedia isso pela bateria, e de quebra zera
+  o custo ocioso, que é onde o aparelho passa quase todo o tempo.
+- O rosto não pode derrubar o aparelho: observador que levanta exceção vira log,
+  servidor que não sobe devolve `False` e o turno continua. A tela é vitrine; o
+  timer é função.
+- Sem dependência nova: o servidor da página é o próprio `websockets` que o
+  `ws_client` já usa, respondendo HTTP pelo `process_request` na mesma porta.
+
+**O critério de aceite da Fase 4 muda.** "Sem travar durante o áudio" não mede
+nada: o rosto pode ser fluido e ainda assim roubar o núcleo do STT. O critério
+passa a ser **o rosto ligado não piorar o RTF do STT**, medido na Pi, com e sem
+a página aberta.
+
+**Nada disso foi medido.** Não há Pi aqui. Os custos citados são ordem de
+grandeza conhecida, não medição deste projeto — e é exatamente por isso que a
+fronteira trocável existe.
+
+**Adendo, mesmo dia — o tema.** O rosto virou dois: `minimo` (dois retângulos
+arredondados) e `anime` (olhos amendoados com íris, cílio, sobrancelha e boca),
+escolhidos por `FACE_THEME`. Não é indecisão: é a fronteira sendo usada. Os dois
+recebem o mesmo `{state, emotion}`, rodam o mesmo `face.js` e são servidos pelo
+mesmo servidor — o que muda é só o desenho.
+
+O `anime` custou quatro geometrias antes de ficar de pé, e o que ele ensinou é
+que **desenhar deixa de ser problema de código muito antes do que parece**. Os
+erros não foram de CSS: foram de anatomia. Um olho de anime não é uma elipse com
+um traço em cima — é uma amêndoa assimétrica, com a íris *cortada* pela pálpebra
+e o branco aparecendo só nos cantos. Enquanto a íris coube inteira dentro do
+branco, o rosto ficou com cara de desenho infantil, e nenhuma quantidade de
+ajuste fino ia consertar isso.
+
+Dois bugs valem registro porque são do tipo que teste não pega:
+- o recorte da pálpebra trabalha em coordenadas do viewBox e o cílio anda a
+  partir de onde está. Fechar "até 52" cortava zero (o olho começa em 74) e
+  ainda assim descia o cílio: cílio boiando no meio do olho. Resolvido dando ao
+  recorte a **mesma curva** do cílio — aí o mesmo número serve para os dois;
+- o arco do olho fechado (o `^^` de alegria) estava na cor das sobrancelhas.
+  No papel ele seria escuro sobre a pele; aqui não há pele, e ele nasceu
+  invisível sobre o fundo preto.
+
+**Se um dia a qualidade do desenho for o gargalo,** o caminho não é mais uma
+rodada de SVG à mão: é arte pré-renderizada em sprites, tocada pelo mesmo
+contrato. Ganha em fidelidade e é ainda mais barata de CPU (decodificação em
+hardware); perde em flexibilidade, porque mudar a expressão vira re-render do
+asset. Fica registrado como a saída, não como o plano.
+
+**Revisar esta decisão quando:** a medição na Pi mostrar o RTF piorando com a
+página aberta. Aí o assinante muda, e o resto fica.

@@ -41,6 +41,7 @@ from device.audio.capture import Microphone  # noqa: E402
 from device.audio.playback import Speaker  # noqa: E402
 from device.config import config, voice_path  # noqa: E402
 from device.local import LocalServices, Scheduler, ScheduleStore  # noqa: E402
+from device.rosto import start_face  # noqa: E402
 from device.router import match as match_intent  # noqa: E402
 from device.router.intents import Intent  # noqa: E402
 from device.state import StateMachine  # noqa: E402
@@ -139,8 +140,20 @@ async def handle_incoming(
             return
 
 
-async def run(text_mode: bool) -> None:
+async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
     machine = StateMachine()
+
+    # O rosto sobe antes de tudo e é o primeiro a assinar a máquina: assim ele
+    # já mostra o carregamento do STT em vez de aparecer com o aparelho pronto.
+    # Se não subir, o aparelho continua -- a tela é vitrine, o turno é função.
+    face = await start_face(config.face_port, config.face_theme) if config.face_enabled else None
+    if face is not None:
+        machine.subscribe(face.publish)
+        print(f"rosto: {face.url}")
+        if abrir_rosto:
+            import webbrowser
+
+            webbrowser.open(face.url)
 
     voice = PiperVoiceEngine(voice_path())
     print(f"voz: {voice.name} ({voice.sample_rate} Hz)")
@@ -204,6 +217,8 @@ async def run(text_mode: bool) -> None:
         finally:
             await scheduler.stop()
             store.close()
+            if face is not None:
+                await face.stop()
 
 
 #: Nome da ferramenta (como o LLM a conhece) -> intenção que `device/local/` já
@@ -328,6 +343,11 @@ def main() -> None:
         help="digitar em vez de falar; nao carrega o STT",
     )
     parser.add_argument("--verbose", action="store_true", help="log do STT e da captura")
+    parser.add_argument(
+        "--rosto",
+        action="store_true",
+        help="abre o rosto no navegador ao subir (o servidor sobe de qualquer jeito)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -335,7 +355,7 @@ def main() -> None:
         format="%(name)s %(message)s",
     )
     try:
-        asyncio.run(run(args.text))
+        asyncio.run(run(args.text, args.rosto))
     except (KeyboardInterrupt, EOFError):
         print("\ntchau.")
         sys.exit(0)

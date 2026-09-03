@@ -67,25 +67,34 @@ device/
   router/       roteador de intenções (seção 5): decide se resolve
                 aqui ou manda para o gateway. Hoje só regex (D17)
   local/        timers, alarmes, a hora — SQLite + agendador, sem rede
-  face/         o rosto: HTML/CSS/JS servido localmente
-  state.py      IDLE → LISTENING → THINKING → SPEAKING
+  rosto/        o rosto (D27): servidor local + static/ com a página
+  state.py      IDLE → LISTENING → THINKING → SPEAKING, e o gancho
+                de observador que o rosto assina
   tts/          síntese local: a voz própria, treinada em lab/finetune
   ws_client.py  a ÚNICA conexão com o mundo externo
-  config.py     áudio e display por variável de ambiente
+  config.py     áudio, display e rosto por variável de ambiente
   main.py       entrypoint do processo (--text, --verbose)
 ```
 
 O fluxo lê de cima para baixo: `activation/` dispara → `audio/` captura →
 `router/` decide → ou `local/` executa, ou `ws_client.py` manda para o gateway.
-`face/` reflete `state.py` o tempo todo.
+`rosto/` reflete `state.py` o tempo todo — e por assinatura, não por consulta:
+`StateMachine.transition()` avisa quem se registrou, e o rosto é um dos
+registrados. Ele fica *dentro* do `transition` porque todas as ~8 chamadas do
+`main.py` já passam por lá; espalhar o aviso por elas seria uma chance de
+esquecer uma.
 
 **Por que `local/` é separado de `router/`:** o roteador só *classifica*; quem
 *executa* é `local/`. E a execução local acontece venha a ordem de onde vier,
 inclusive de um `tool_call` devolvido pelo gateway — a segunda regra
 inegociável da seção 14. É isso que faz o despertador tocar com a internet caída.
 
-`face/` não tem `__init__.py`: não é pacote Python, é uma app web servida para
-o Chromium.
+`rosto/` é pacote Python (tem servidor), mas `rosto/static/` não: ali dentro é
+HTML, CSS e JS servidos para o Chromium, e nada de lá é importado.
+
+**A camada não pode derrubar o aparelho.** Observador que levanta exceção vira
+log; servidor que não consegue abrir a porta devolve `False` e o turno continua.
+A tela é vitrine, o timer é função — e essa ordem é a decisão, não um acidente.
 
 ---
 

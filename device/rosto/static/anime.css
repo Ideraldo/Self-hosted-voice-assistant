@@ -1,0 +1,179 @@
+/*
+  Mesma regra do tema mínimo, e aqui ela é mais fácil de quebrar porque há mais
+  peças: SÓ `transform` e `opacity` animam. Gradiente é pintado uma vez; o que
+  se mexe são grupos inteiros, na GPU. Animar `stroke-width` ou `d` -- que é a
+  tentação óbvia num rosto desenhado -- põe o trabalho de volta na CPU, que é a
+  CPU do Whisper.
+*/
+
+:root {
+  --fundo: #070910;
+  --traco: #0d1424;      /* cílio, sobrancelha, boca */
+  --brilho: 0 0 18px rgba(79, 200, 255, .3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--fundo);
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: none;
+  font-family: system-ui, sans-serif;
+}
+
+.rosto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.face {
+  width: min(76vw, calc(70vh * 1.9));
+  will-change: transform;
+}
+
+.branco { fill: url(#branco); }
+.iris-disco { fill: url(#iris); }
+.pupila { fill: #071021; }
+.luz { fill: #fff; }
+.luz--grande { opacity: .95; }
+.luz--pequena { opacity: .5; }
+
+
+/* O arco do olho fechado é CLARO, não da cor do traço. Num rosto desenhado no
+   papel ele seria uma linha escura sobre a pele; aqui não há pele -- o fundo é
+   quase preto --, e desenhá-lo com a cor das sobrancelhas o deixou literalmente
+   invisível na primeira tentativa. Quem faz o papel da pele aqui é o brilho. */
+.arco { stroke: #a9ecff; }
+
+.cilio, .sobrancelha, .boca, .arco {
+  fill: none;
+  stroke-linecap: round;
+}
+.cilio, .sobrancelha, .boca { stroke: var(--traco); }
+.cilio { stroke-width: 24; }
+.arco  { stroke-width: 20; opacity: 0; }
+.sobrancelha { stroke-width: 15; }
+.boca { stroke-width: 12; }
+
+.eye { filter: drop-shadow(var(--brilho)); }
+
+/* Origem no centro de cada peça: é o que faz escala virar "pupila dilatando" e
+   rotação virar "sobrancelha erguendo", em vez de tudo fugir para o canto. */
+.tilt, .iris, .cilio, .sobrancelha, .boca, .arco {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 320ms cubic-bezier(.22, 1, .36, 1), opacity 220ms;
+}
+.palpebra { transition: transform 200ms cubic-bezier(.4, 0, .2, 1); }
+
+/*
+  Recorte e cílio compartilham a curva, então compartilham o número: o mesmo
+  `translateY` nos dois, sempre. Fechar por inteiro custa 240: a altura do olho
+  é ~204, mas a curva da pálpebra é mais alta no meio que nas pontas, e parar em
+  204 deixava dois riscos de esclera assomando embaixo. Qualquer valor menor é
+  uma pálpebra a meio caminho, que é justamente o que "pensando" quer.
+*/
+
+/* ---------- estados: o ciclo do turno ---------- */
+
+[data-state="idle"] .face { opacity: .6; animation: respirar 5.5s ease-in-out infinite; }
+[data-state="idle"] .palpebra,
+[data-state="idle"] .cilio { animation: piscar 6.4s ease-in-out infinite; }
+
+[data-state="listening"] .face { opacity: 1; }
+[data-state="listening"] .iris { transform: scale(1.09); }
+[data-state="listening"] .sobrancelha { transform: translateY(-10px); }
+
+/* Pensando: olha para cima e para o lado, pálpebra meio baixa. É o estado
+   mais barato dos quatro de propósito -- é o que dura enquanto o STT e o LLM
+   trabalham, e é nele que a animação mais atrapalharia. */
+[data-state="thinking"] .face { opacity: .92; }
+[data-state="thinking"] .iris { transform: translate(26px, -22px); }
+[data-state="thinking"] .palpebra,
+[data-state="thinking"] .cilio { transform: translateY(56px); }
+[data-state="thinking"] .sobrancelha--esq { transform: rotate(-9deg) translateY(-6px); }
+
+[data-state="speaking"] .face { opacity: 1; }
+[data-state="speaking"] .boca { animation: falar 460ms ease-in-out infinite; }
+
+/* ---------- emoções: o segundo eixo ---------- */
+/* Nada envia isto ainda (ver `Emotion` em common/messages.py). */
+
+/* Alegre: olhos fechados e o arco aparece. É o ^^ que todo anime usa, e ele
+   funciona porque a informação está na CURVA, não no olho. */
+[data-emotion="happy"] .palpebra,
+[data-emotion="happy"] .cilio { transform: translateY(240px); }
+[data-emotion="happy"] .cilio { opacity: 0; }
+[data-emotion="happy"] .arco { opacity: 1; }
+[data-emotion="happy"] .sobrancelha { transform: translateY(-14px); }
+[data-emotion="happy"] .boca { transform: scaleY(1.5); }
+
+[data-emotion="curious"] .tilt { transform: rotate(-6deg); }
+[data-emotion="curious"] .sobrancelha--esq { transform: translateY(-20px) rotate(-8deg); }
+[data-emotion="curious"] .iris { transform: translate(16px, -8px); }
+
+[data-emotion="confused"] .tilt { transform: rotate(4deg); }
+[data-emotion="confused"] .sobrancelha--esq { transform: translateY(-18px) rotate(10deg); }
+[data-emotion="confused"] .sobrancelha--dir { transform: translateY(10px) rotate(10deg); }
+[data-emotion="confused"] .boca { transform: rotate(180deg) scale(.8); }
+
+/* Triste: a sobrancelha sobe por DENTRO e desce por fora. Esse é o traço --
+   mais do que o olho -- que a gente lê como tristeza. */
+[data-emotion="sorry"] .sobrancelha--esq { transform: rotate(13deg) translateY(6px); }
+[data-emotion="sorry"] .sobrancelha--dir { transform: rotate(-13deg) translateY(6px); }
+[data-emotion="sorry"] .palpebra,
+[data-emotion="sorry"] .cilio { transform: translateY(76px); }
+[data-emotion="sorry"] .iris { transform: translateY(16px); }
+[data-emotion="sorry"] .boca { transform: rotate(180deg) scale(.85); }
+
+/* O humor vence o estado quando os dois disputam a mesma peça: é o humor que
+   se lê primeiro num rosto. */
+[data-emotion="happy"] .palpebra,
+[data-emotion="happy"] .cilio,
+[data-emotion="sorry"] .palpebra,
+[data-emotion="sorry"] .cilio { animation: none; }
+
+/* ---------- conexão ---------- */
+
+/* Sem servidor, apaga em vez de mentir um estado velho. */
+[data-conexao="offline"] .face { opacity: .12; }
+
+.legenda {
+  position: fixed;
+  bottom: 3vh;
+  color: rgba(255, 255, 255, .28);
+  font-size: 14px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.legenda[data-visivel="1"] { opacity: 1; }
+
+@keyframes respirar {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.012); }
+}
+/* O piscar é duas animações no mesmo compasso: o recorte fecha o olho e o
+   cílio desce até virar a linha do olho fechado. Separadas porque uma anda
+   em coordenadas do viewBox e a outra no seu próprio box. */
+/* Uma animação só, usada pelas duas peças: elas andam juntas por construção. */
+@keyframes piscar {
+  0%, 93%, 100% { transform: translateY(0); }
+  96%           { transform: translateY(240px); }
+}
+@keyframes falar {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(2.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .face, .palpebra, .cilio, .boca { animation: none !important; }
+}

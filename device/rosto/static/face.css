@@ -1,0 +1,164 @@
+/*
+  Regra única desta folha: só `transform` e `opacity` animam.
+  Qualquer outra propriedade (width, top, filter, fill) obriga o navegador a
+  recalcular layout ou repintar a cada quadro, na CPU -- que na Pi é a mesma CPU
+  que está transcrevendo. Com transform e opacity o trabalho fica na GPU e o
+  Whisper não sente. Se um dia alguém animar `filter: blur()` aqui, é isso que
+  vai regredir, e não vai aparecer em teste nenhum.
+*/
+
+:root {
+  --fundo: #05070c;
+  --olho: #38e0ff;
+  --brilho: 0 0 32px rgba(56, 224, 255, 0.55);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--fundo);
+  overflow: hidden;
+  /* Kiosk numa tela sensível ao toque: sem seleção, sem realce de toque,
+     sem zoom por dois dedos. */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: none;
+  font-family: system-ui, sans-serif;
+}
+
+.rosto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.face {
+  width: min(92vw, calc(92vh * 2));
+  /* `will-change` avisa o compositor antes do primeiro quadro. Sem isso o
+     primeiro piscar promove a camada no meio da animação, e ele engasga. */
+  will-change: transform;
+}
+
+.eye {
+  /* O brilho vive aqui, no grupo, e não no `rect`: ver o comentário do SVG. */
+  filter: drop-shadow(var(--brilho));
+}
+
+.eye rect {
+  fill: var(--olho);
+  /* A origem no centro de cada olho é o que faz escala virar "fechar a
+     pálpebra" em vez de "encolher para o canto". */
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 260ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.palpebra {
+  /* Sem `transform-box` aqui de propósito: dentro do clipPath a conta é em
+     unidades do viewBox, e é assim que 205px cai no meio do olho. */
+  transition: transform 300ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.eye, .tilt {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 380ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ---------- estados: o ciclo do turno ---------- */
+
+/* Ocioso: respira devagar e pisca de vez em quando. É o estado em que o
+   aparelho passa 99% do tempo, então tudo aqui é lento e escuro de propósito --
+   um rosto agitado numa mesa de cabeceira é um rosto que se desliga. */
+[data-state="idle"] .face { opacity: .55; animation: respirar 5.5s ease-in-out infinite; }
+[data-state="idle"] .eye rect { animation: piscar 6.2s ease-in-out infinite; }
+[data-state="idle"] .eye--right rect { animation-delay: 40ms; }
+
+/* Ouvindo: acorda. Olhos abertos e um pulso curto -- a única deixa visual de
+   que o microfone está de fato gravando. */
+[data-state="listening"] .face { opacity: 1; }
+[data-state="listening"] .eye rect { transform: scaleY(1.12) scaleX(1.04); animation: pulsar 1.6s ease-in-out infinite; }
+
+/* Pensando: os olhos vagam para cima, que é o que todo mundo faz ao pensar.
+   Este é o estado do RTF: enquanto ele dura, o Whisper e o LLM estão
+   trabalhando, e a animação aqui é a mais barata das quatro. */
+[data-state="thinking"] .face { opacity: .9; }
+[data-state="thinking"] .eye rect { transform: scaleY(.78); }
+[data-state="thinking"] .tilt { animation: vaguear 2.8s ease-in-out infinite; }
+
+/* Falando: um balanço leve. Não é sincronizado com a fala -- o dispositivo não
+   manda amplitude, e mandar exigiria áudio subindo para a tela a 50 Hz. */
+[data-state="speaking"] .face { opacity: 1; }
+[data-state="speaking"] .eye rect { animation: falar 420ms ease-in-out infinite; }
+[data-state="speaking"] .eye--right rect { animation-delay: 70ms; }
+
+/* ---------- emoções: o segundo eixo, ortogonal ao de cima ---------- */
+/* Nada aqui é enviado pelo gateway ainda (ver `Emotion` em common/messages.py).
+   Está escrito para o eixo existir de ponta a ponta e ser testável hoje. */
+
+/* Alegre: a pálpebra desce e sobra a curva de baixo. O olho não muda de
+   escala -- o que muda é o quanto dele se vê. */
+[data-emotion="happy"] .palpebra { transform: translateY(205px); }
+[data-emotion="curious"] .tilt { transform: rotate(-7deg); }
+[data-emotion="curious"] .eye--left rect { transform: scaleY(.82); }
+[data-emotion="confused"] .tilt { transform: rotate(5deg); }
+[data-emotion="confused"] .eye--right rect { transform: scaleY(.6) translateY(12%); }
+[data-emotion="sorry"] .eye rect { transform: scaleY(.7); }
+[data-emotion="sorry"] .eye--left rect { transform: scaleY(.7) rotate(9deg); }
+[data-emotion="sorry"] .eye--right rect { transform: scaleY(.7) rotate(-9deg); }
+
+/* A emoção vence o estado quando as duas mexem na mesma propriedade: o humor é
+   o que a pessoa lê primeiro. Só o piscar do ocioso continua por baixo. */
+[data-emotion="sorry"] .eye rect,
+[data-emotion="confused"] .eye--right rect,
+[data-emotion="curious"] .eye--left rect { animation: none; }
+
+/* ---------- conexão ---------- */
+
+/* Sem servidor, o rosto apaga em vez de mentir um estado velho. */
+[data-conexao="offline"] .face { opacity: .12; }
+
+.legenda {
+  position: fixed;
+  bottom: 3vh;
+  color: rgba(255, 255, 255, .28);
+  font-size: 14px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.legenda[data-visivel="1"] { opacity: 1; }
+
+@keyframes respirar {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.015); }
+}
+@keyframes piscar {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(.06); }
+}
+@keyframes pulsar {
+  0%, 100% { transform: scaleY(1.12) scaleX(1.04); }
+  50%      { transform: scaleY(1.18) scaleX(1.06); }
+}
+@keyframes vaguear {
+  0%, 100% { transform: translate(0, 0); }
+  30%      { transform: translate(-2.5%, -3%); }
+  65%      { transform: translate(2.5%, -2%); }
+}
+@keyframes falar {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(.88); }
+}
+
+/* Quem pediu menos movimento, recebe menos movimento. Vale também para a Pi:
+   um `prefers-reduced-motion` forçado no Chromium é a forma mais barata de
+   medir quanto a animação custa. */
+@media (prefers-reduced-motion: reduce) {
+  .face, .eye rect, .tilt { animation: none !important; }
+}
