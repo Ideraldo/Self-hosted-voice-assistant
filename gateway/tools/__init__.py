@@ -18,6 +18,7 @@ from gateway.tools.search import (
     SEARCH_TOOLS,
     Brave,
     DuckDuckGo,
+    Leitor,
     SearchProvider,
     executar_busca,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "SEARCH_TOOLS",
     "SEARCH_TOOL_NAMES",
     "SearchProvider",
+    "Leitor",
     "DuckDuckGo",
     "Brave",
     "executar_busca",

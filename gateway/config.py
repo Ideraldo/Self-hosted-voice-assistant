@@ -44,6 +44,18 @@ class GatewayConfig:
     search_provider: str = os.getenv("SEARCH_PROVIDER", "duckduckgo")
     search_api_key: str | None = os.getenv("SEARCH_API_KEY")
     search_region: str = os.getenv("SEARCH_REGION", "br-pt")
+    # Abrir o primeiro resultado e ler o texto dele, alem do trecho do
+    # buscador. **Desligado por padrao, e o motivo e medicao, nao preguica**
+    # (D28): em 4 perguntas medidas em 03/09/2026 o trecho ja respondia todas,
+    # e a pagina custou de 1 a 3 s num turno que ja e o mais lento do aparelho.
+    # A leitura funciona e esta testada; falta a pergunta que a justifique.
+    # Ligar e SEARCH_READ_PAGE=1.
+    search_read_page: bool = os.getenv("SEARCH_READ_PAGE", "0").lower() in (
+        "1",
+        "true",
+        "on",
+        "yes",
+    )
     stt_api_key: str | None = os.getenv("STT_API_KEY")
     tts_api_key: str | None = os.getenv("TTS_API_KEY")
 

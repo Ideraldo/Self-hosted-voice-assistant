@@ -1214,3 +1214,87 @@ asset. Fica registrado como a saída, não como o plano.
 
 **Revisar esta decisão quando:** a medição na Pi mostrar o RTF piorando com a
 página aberta. Aí o assinante muda, e o resto fica.
+
+---
+
+## D28 — Ler a primeira página: escrito, medido, e desligado
+
+**Data:** 2026-09-03
+**O diário pedia:** "se aparecer pergunta em que o trecho do buscador não
+chega, o próximo passo são ~30 linhas lendo a primeira página, e não um
+framework (D25)". Foi feito. O que não estava previsto é o que a medição
+respondeu.
+
+**A dúvida:** o trecho que o DuckDuckGo devolve tem 400 caracteres. Ele responde
+"quando foi" e não parecia responder "por quê" — duas linhas de resumo não
+explicam nada. A hipótese era que abrir a página fecharia essa lacuna.
+
+**O que foi construído:** `Leitor`, em `gateway/tools/search.py`. Uma requisição
+HTTP com `httpx`, um extrator de texto em cima do `HTMLParser` da biblioteca
+padrão, e o texto entrando no prompt amarrado ao `[1]`. Sem dependência nova, e
+sem framework de RAG — o extrator inteiro tem menos linhas que a configuração
+que um framework pediria.
+
+Os limites são todos defensivos, porque a leitura acontece dentro do turno mais
+lento que o aparelho tem: 5 s de timeout, 400 KB de teto de download, 2000
+caracteres de corte, `content-type` conferido antes de baixar (PDF não vira
+texto), e página que sobrou em menos de 200 caracteres — paywall, app em
+JavaScript — devolve nada, porque ocupar prompt sem informar é pior que não ler.
+
+**Só o primeiro resultado.** Abrir os cinco multiplicaria por cinco o pedaço mais
+caro do turno, e o buscador já ordenou: se a resposta não está no primeiro, ela
+provavelmente também não estava no quarto.
+
+### Duas coisas que a rede ensinou, e nenhuma delas era a esperada
+
+**O User-Agent não abre porta.** A primeira versão fingia ser um Firefox, pelo
+motivo de sempre — "senão levam 403". Medido em cinco sites: `httpx` cru,
+Firefox, Chrome e um nome honesto entraram exatamente nos mesmos quatro e
+levaram 403 do mesmo. Fingir navegador não comprava nada. Ficou o nome do
+aparelho.
+
+**A Wikipedia é o caso que importa e era o que estava quebrando.** Ela responde
+403 à leitura direta de `/wiki/...` com qualquer User-Agent, e no corpo do erro
+manda usar a API. Era metade das falhas — e justamente nas perguntas de
+conhecimento, que são a razão da busca existir (D20). O caminho da API entrou:
+`action=query&prop=extracts&explaintext`, que devolve o artigo já sem marcação,
+melhor do que qualquer coisa que o extrator faria. Detalhe medido: sem uma **URL
+de contato** dentro do User-Agent a API também devolve 403; o mesmo pedido passou
+a 200 só de acrescentá-la.
+
+Com isso, a leitura foi de **4/10 para 10/10** primeiros resultados lidos,
+mediana de 0,62 s e pior caso 0,84 s.
+
+### E aí a medição derrubou a premissa
+
+Quatro perguntas, o mesmo qwen3:8b, duas respostas cada — uma só com os trechos,
+outra com os trechos mais a página:
+
+| pergunta | só trechos | com a página |
+|---|---|---|
+| por que o céu é azul | respondeu | respondeu, e citou oxigênio e nitrogênio |
+| por que a Pi 5 perde a hora | respondeu | respondeu igual |
+| como funciona o café coado | respondeu | respondeu, e citou o Hario V60 |
+| medalhas do Brasil em 2024 | 20, com a divisão certa | igual, mais "segundo melhor da história" |
+
+**O trecho bastou nas quatro.** A página acrescentou vocabulário, não resposta.
+E cobrou: de 1 a 3 s por turno, somando o download e o prompt que dobra de
+tamanho — num turno que já levava 7 a 12 s.
+
+**Decisão: fica desligado por padrão** (`SEARCH_READ_PAGE=0`). Não é dúvida sobre
+o código, que está escrito e coberto por 30 testes; é que a pergunta que
+justifica o custo ainda não apareceu. A hipótese do diário era razoável e a
+medição disse não — que é exatamente para isso que se mede antes.
+
+**Consequências:**
+- A busca ganhou os testes que nunca teve. Ela subiu para produção testada só à
+  mão, com rede de verdade; agora os casos que a web serve todo dia — 403, PDF
+  no primeiro resultado, paywall, timeout — estão presos em teste.
+- A regra da camada é a mesma do rosto (D27): **a leitura não pode derrubar o
+  turno.** Toda falha vira `None`, e a busca responde o que já respondia.
+- Ligar é uma variável. Se um dia aparecer a pergunta em que o trecho não chega,
+  não há nada a escrever.
+
+**Revisar esta decisão quando:** houver log de uso real com uma pergunta que o
+trecho não respondeu. Aí a comparação se repete com perguntas de verdade, e não
+com quatro que eu escolhi — que é a fraqueza óbvia da medição acima.

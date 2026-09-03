@@ -85,6 +85,7 @@ class Session:
         expected_token: str,
         spotify: object | None = None,
         search: object | None = None,
+        leitor: object | None = None,
     ) -> None:
         self._ws = websocket
         self._llm = llm
@@ -95,6 +96,9 @@ class Session:
         # ferramenta indisponível tenta usar mesmo assim (D19).
         self._spotify = spotify
         self._search = search
+        # O leitor só faz sentido com busca: é ela que produz a URL. Sem
+        # provedor ele fica pendurado sem nunca ser chamado, e tudo bem.
+        self._leitor = leitor
         self._tools = (
             DEVICE_TOOLS
             + (SPOTIFY_TOOLS if spotify is not None else [])
@@ -245,7 +249,7 @@ class Session:
                 break
 
             if nome in SEARCH_TOOL_NAMES:
-                resultado = await executar_busca(self._search, nome, args)
+                resultado = await executar_busca(self._search, nome, args, self._leitor)
             elif nome in SPOTIFY_TOOL_NAMES:
                 # O gateway executa: o segredo mora aqui.
                 resultado = await executar_spotify(self._spotify, nome, args)

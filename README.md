@@ -270,6 +270,17 @@ sentence, so the model has to write the spoken answer from them.
 It does not search what it already knows -- 2.1s for those, 7-12s for a searched
 turn. Grounding costs time; that is the trade, not a defect.
 
+**Reading the first result** goes one step further: `SEARCH_READ_PAGE=1` opens
+the top hit and feeds its text to the model alongside the extracts. Wikipedia
+gets its own path -- it answers 403 to scraping with *any* User-Agent (measured)
+and asks callers to use its API, so that is what we do. With that, page reading
+went from 4/10 first results to **10/10**, median 0.62s.
+
+It ships **off**, and the reason is the measurement, not caution: across four
+questions the extracts already answered every one, and the page added 1-3s to
+the slowest turn the device has for marginally richer wording. The code is
+written and tested; what is missing is the question that justifies it (D28).
+
 Home Assistant is out of scope -- one smart bulb does not justify Tailscale and
 phase 5: a single smart bulb does not pay for a Home Assistant instance and a
 Tailscale link to reach it.

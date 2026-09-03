@@ -14,7 +14,13 @@ from gateway.api.session import Session  # noqa: E402
 from gateway.config import config  # noqa: E402
 from gateway.llm.base import LLMProvider  # noqa: E402
 from gateway.llm.ollama import OllamaProvider  # noqa: E402
-from gateway.tools import Brave, DuckDuckGo, SearchProvider, SpotifyClient  # noqa: E402
+from gateway.tools import (  # noqa: E402
+    Brave,
+    DuckDuckGo,
+    Leitor,
+    SearchProvider,
+    SpotifyClient,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
@@ -90,8 +96,22 @@ def build_search() -> SearchProvider | None:
     return None
 
 
+def build_leitor() -> Leitor | None:
+    """O leitor da primeira página, ou None se ninguém pediu.
+
+    Separado do provedor de propósito: ler a página é ortogonal a quem buscou, e
+    quem precisar cortar segundos do turno desliga a leitura sem perder a busca.
+    """
+    if not config.search_read_page:
+        logging.info("busca: leitura da primeira pagina desligada")
+        return None
+    logging.info("busca: leitura da primeira pagina ligada")
+    return Leitor()
+
+
 spotify = build_spotify()
 search = build_search()
+leitor = build_leitor() if search is not None else None
 
 
 @app.get("/health")
@@ -101,6 +121,7 @@ async def health() -> dict[str, str]:
         "llm": f"{config.llm_provider}:{config.llm_model}",
         "spotify": "on" if spotify is not None else "off",
         "busca": getattr(search, "nome", "off"),
+        "leitura": "on" if leitor is not None else "off",
     }
 
 
@@ -112,5 +133,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         expected_token=config.device_token,
         spotify=spotify,
         search=search,
+        leitor=leitor,
     )
     await session.run()
