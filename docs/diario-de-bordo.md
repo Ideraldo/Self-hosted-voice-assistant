@@ -2059,8 +2059,17 @@ Em aberto:
 - Se o gateway deve re-transcrever com um modelo maior — a pergunta de D1 que
   D13 deixou sem caminho, porque o áudio não sobe mais
 
-Ainda não começou: embeddings no roteador, volume, modo tradutor, rosto, wake
-word, VPS, hardware.
+Ainda não começou: embeddings no roteador, volume, modo tradutor, VPS,
+hardware.
+
+**Fase 4 entregue**, e verificada rodando: os quatro estados animam, os dois
+temas sobem, o rosto apaga quando o servidor morre e reconecta sozinho quando
+ele volta (D27).
+
+**Fase 7 começada.** O encanamento do wake word está de pé e testado sem
+microfone (D30), e o modelo do "Ideraldinho" foi treinado com as vozes pt-BR do
+Piper que já estavam aqui (D31). O que falta é o único número que decide:
+falso positivo por hora, com o microfone e a sala reais.
 
 ---
 

@@ -1405,3 +1405,127 @@ por hora, que é como se acha o corte e como se mede o critério de aceite.
 **Revisar esta decisão quando:** existir o modelo do "Ideraldinho" e um
 microfone para medir. Aí o número que interessa — falso positivo por hora —
 finalmente pode ser obtido, e o threshold deixa de ser 0,5 por falta de dado.
+
+---
+
+## D31 — O wake word treinado com o que já estava no disco
+
+**Data:** 2026-09-03
+**O plano diz:** "modelo ONNX treinado com sua voz (150–200 gravações)".
+**A receita do openWakeWord diz:** dezenas de milhares de positivos sintetizados
+com o `piper-sample-generator`, mais dezenas de GB de ruído e fala negativa
+baixados do HuggingFace, num notebook com GPU.
+
+**A dúvida:** seguir a receita, ou olhar o que o repositório já tinha.
+
+**O que ele já tinha:** sete vozes pt-BR do Piper, dezoito épocas do fine-tune da
+voz do dono, e as 315 gravações reais do dataset daquele treino (D4). Escolhido o
+caminho local — e a economia de download é a menor das razões.
+
+### As duas razões que decidem, e nenhuma é o tamanho
+
+**A pronúncia.** O checkpoint do `piper-sample-generator` é LibriTTS, em inglês.
+Ele diria "Ideraldinho" com fonemas ingleses, e o modelo aprenderia a palavra
+errada — o pior tipo de defeito, porque treina bem, mede bem, e só falha na
+sala. As vozes pt-BR dizem `ˌideɾaʊdʒˈiɲʊ`, conferido no espeak-ng.
+
+Isso quase passou batido por um motivo instrutivo: a primeira verificação foi
+mandar o Whisper transcrever a palavra sintetizada, e ele devolveu "Hidraudinho"
+e "hidraldinho". Parecia o Piper errando. Não era — **o mesmo Whisper errou
+"que horas são" em quatro das cinco vozes**. O juiz é que estava ruim. Quem
+respondeu foi o espeak, que é onde a pronúncia é decidida.
+
+**Os negativos.** As 315 gravações do dono falando outra coisa são o negativo
+mais difícil que existe para este caso, e o único que importa de verdade: é essa
+voz que fica perto do microfone o dia inteiro. Nenhum dataset do HuggingFace tem
+isso.
+
+### O que se treina, e por que cabe numa tarde
+
+O openWakeWord é dois modelos em série. Um extrator congelado transforma áudio em
+embeddings de (16, 96); em cima dele roda um classificador pequeno. **Só o
+segundo é nosso.** Por isso 3 mil exemplos bastam onde a receita pede dezenas de
+milhares — o trabalho pesado já está no extrator, que ninguém treina.
+
+Duas decisões de formato que não são de gosto:
+
+- **Janela de 2,0 s**, porque é o que o extrator converte em exatamente (16, 96).
+- **A palavra no fim da janela, não no meio.** Em uso, a janela avaliada é sempre
+  a que acabou de passar. Treinar centralizado ensinaria o modelo a esperar meio
+  segundo de silêncio depois do nome — meio segundo a mais para acordar.
+
+### O número que o treino reporta engana em uma ordem de grandeza
+
+O treino deu recall 0,975 e precisão 0,967 sobre janelas de 2 s. Parece bom, e
+**não quer dizer quase nada**: em uso o modelo não vê 390 janelas, ele vê uma
+nova a cada 80 ms — 45 mil por hora. Se fossem independentes, 96,7% de precisão
+seriam mais de mil despertares por hora.
+
+Não são independentes, e o refratário come a maior parte. Mas a diferença entre
+as duas leituras é grande demais para deixar implícita, e é por isso que
+`lab/wakeword/medir.py` existe separado do treino: ele roda a mesma fita como
+fluxo, com o refratário ligado, exatamente como o `device/` roda, e reporta na
+única unidade que o critério de aceite entende — **falso positivo por hora**.
+
+**Consequências:**
+- O `.onnx` sai com entrada (1, 16, 96) e saída (1, 1), que é o formato que o
+  `openwakeword.model.Model` carrega por caminho. Nada em `device/` sabe que
+  este modelo é caseiro — verificado carregando pelo caminho do dispositivo.
+- Os wavs gerados (216 MB) ficam fora do git: são derivados, e dois comandos
+  refazem tudo. Mesma regra do D12.
+- O threshold de partida sobe de 0,5 para o que a medição em fluxo indicar.
+
+**A fraqueza declarada:** não há ruído de sala real neste dataset. O que há é
+ruído sintético — branco, rosa, zumbido de 60 Hz — e um eco simulado. Isso não
+soa como uma cozinha às sete da noite, e é o que a medição com o microfone vai
+cobrar. Nenhum número obtido aqui substitui `python -m scripts.wake --segundos
+3600` com a televisão ligada.
+
+### O primeiro modelo aprendeu a palavra errada, e o erro tem nome
+
+Medido em fluxo, o modelo v1 deu **71 a 101 falsos positivos por hora** — contra
+um critério de menos de um. E subir o threshold de 0,30 para 0,95 só levou de
+101 para 71, o que já dizia que o problema não era o corte: ele disparava com
+confiança, não por pouco.
+
+A quebra por categoria explicou tudo:
+
+| | dispara |
+|---|---|
+| palavras parecidas | 11,7% |
+| o dono falando outra coisa (924 gravações) | 0,1% |
+| ruído puro (400 trechos) | 0% |
+
+E a quebra por palavra explicou melhor ainda:
+
+| | dispara |
+|---|---|
+| Everaldinho | **82,9%** |
+| Reginaldinho | 62,9% |
+| Geraldinho | 42,9% |
+| **Ideraldo** | **0%** |
+| que horas são, cadê você, liga a televisão… | 0% |
+
+**O modelo aprendeu `-aldinho`, e não `Ideraldinho`.** Ele decide pelo fim da
+palavra e ignora o começo — tanto que "Ideraldo", que divide o começo inteiro e
+é o nome do dono da casa, nunca o acorda; enquanto "Everaldinho", que só divide
+o fim, acorda em 83% das vezes.
+
+Faz sentido depois de visto: a janela termina logo depois da palavra, então o
+fim dela é o que está mais perto da borda que o classificador olha. E uma rede
+de três camadas densas pega o atalho que existir.
+
+**O número honesto sem a fita adversária** — só fala real e ruído, que é o que
+uma sala de verdade se parece — foi **2,7 por hora**. Ainda acima do critério,
+mas na ordem de grandeza certa, e sem nenhum ruído de sala real no treino.
+
+**O conserto não é treinar mais tempo, é mudar o que se ensina:** a lista de
+adversárias passou de 6 nomes parecidos para 20, com a família `-aldinho`
+ocupando a maior parte, e mais quatro palavras do outro lado da fronteira
+(`Ideraldo`, `Ideraldão`, `Ideraldina`, `Ideral`) — o começo certo com o fim
+errado. O dataset deixa de parecer a vida real de propósito: o que ele precisa é
+ser denso exatamente onde o modelo errava.
+
+**Revisar esta decisão quando:** houver microfone. Se o falso positivo real for
+alto, o primeiro conserto **não** é treinar mais: é gravar ruído da casa e
+refazer o dataset com ele — porque é exatamente a peça que falta.

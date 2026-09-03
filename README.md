@@ -344,6 +344,57 @@ nothing -- the face can be smooth and still steal the STT's core. It is now
 **the face must not make the STT's RTF worse**, measured on the Pi, page open vs.
 page closed. Nothing here has been measured on a Pi: there is no Pi yet.
 
+## Phase 7 -- the wake word
+
+The device can wait for its name instead of listening to everything. It ships
+**off** (`WAKE_ENABLED=1` turns it on), because the models that come with
+openWakeWord are `alexa` and `hey_jarvis` -- a device that answers to the wrong
+name is worse than one with no wake word at all.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WAKE_ENABLED` | `0` | `1` makes the device wait for the name before listening |
+| `WAKE_MODEL` | `hey_jarvis` | a bundled name, or the path to your own `.onnx` |
+| `WAKE_THRESHOLD` | `0.5` | the number no code can pick for you -- see below |
+
+**Cost, measured on this machine (03/09/2026):** 1.0 ms per 30 ms frame, RTF
+**0.033**, through the device's own path. The headroom for a Pi five times
+slower is arithmetic, not measurement.
+
+**The threshold is not a code constant.** It depends on the microphone, the
+distance and the room. This shows the score live and counts activations per
+hour, which is also how the phase's acceptance criterion gets measured:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.wake                # find the threshold
+.\.venv\Scripts\python.exe -m scripts.wake --segundos 3600  # false positives/hour
+```
+
+### Training "Ideraldinho" without downloading the internet
+
+openWakeWord's official recipe wants tens of thousands of positives from an
+**English** LibriTTS checkpoint plus tens of GB of negatives. This repo already
+held something better: seven pt-BR Piper voices, the fine-tune epochs of the
+owner's own voice, and the 315 real recordings from that fine-tune's dataset.
+
+```powershell
+.\.venv\Scripts\python.exe -m lab.wakeword.gerar     # ~1200 positives, ~2000 negatives
+.\.venv\Scripts\python.exe -m lab.wakeword.treinar   # embed, train, export .onnx
+.\.venv\Scripts\python.exe -m lab.wakeword.medir     # false positives per HOUR
+```
+
+Two reasons the local path wins, and size is neither. **Pronunciation**: an
+English TTS would say "Ideraldinho" with English phonemes and the model would
+learn the wrong word -- it would train well, measure well, and fail only in the
+room. **Negatives**: 315 recordings of the owner saying other things is the
+hardest negative there is for this case, and the only one that matters, because
+that is the voice near the microphone all day.
+
+Only the classifier is trained; the embedding extractor is frozen and shared
+with the bundled models. That is why 3k examples do the job of the recipe's tens
+of thousands. Details, and the declared weakness (no real room noise in the
+dataset), in `lab/wakeword/README.md` and D31.
+
 ## Choosing STT and TTS
 
 `lab/` is where engines are measured before becoming an implementation under

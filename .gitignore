@@ -23,3 +23,7 @@ device/data/
 
 # credenciais do gateway: refresh token do Spotify
 gateway/data/
+
+# wake word: os wavs gerados e os embeddings sao derivados -- dois comandos
+# refazem tudo (lab/wakeword/README.md), e sao ~200 MB
+lab/wakeword/dados/
