@@ -1343,3 +1343,65 @@ teria ficado caro de verdade.
 - O **diário fica como foi escrito** onde ele narra o dia 1 escolhendo o nome
   Marcos. Aquilo aconteceu. O resto do diário, que fala no presente, virou
   Ideraldinho.
+
+---
+
+## D30 — O wake word entra pelo encanamento, e o modelo vem depois
+
+**Data:** 2026-09-03
+**O plano diz:** Fase 7, openWakeWord, "modelo ONNX treinado com sua voz
+(150–200 gravações)", critério de aceite "< 1 falso positivo/hora".
+
+**A dúvida:** a Fase 7 é a primeira coisa do projeto que roda **sem ninguém ter
+pedido nada**. Isso inverte a natureza do erro. O STT errar custa uma frase
+repetida; o wake word errar custa o aparelho acordando sozinho às três da
+manhã. Por isso o critério de aceite dele é um número de falso positivo por
+hora, e não uma taxa de acerto — e por isso ele **não pode ser validado aqui**,
+sem o microfone, sem a sala e sem a televisão ligada.
+
+**O que foi feito:** a camada `device/activation/`, com o modelo trocável e
+tudo o que fica em volta dele testado — 17 testes, nenhum precisando de
+microfone. É a mesma escolha do rosto (D27) e da leitura de página (D28): a
+parte que quebra calado é o encanamento, não o modelo.
+
+**Números medidos aqui em 03/09/2026, pelo caminho do dispositivo:** 1,0 ms por
+frame de 30 ms, **RTF 0,033**. Sobra folga para a Pi ser cinco vezes mais lenta
+e ainda ficar em 0,17 — mas isso é aritmética, não medição, e a Pi é quem
+responde.
+
+### O que estava difícil de acertar, e não era o modelo
+
+**Os blocos.** O openWakeWord trabalha em 1280 amostras (80 ms) e a captura
+entrega frames de 30 ms, porque é o que o webrtcvad aceita. Alguém tem que
+juntar os pedaços sem perder amostra na emenda — e uma amostra perdida por
+bloco não aparece em teste nenhum, só numa taxa de acerto pior sem explicação.
+
+**O refratário.** A mesma palavra pontua alto em três blocos seguidos. Sem
+silenciar depois de um acerto, uma chamada abriria três turnos.
+
+**O reset antes da espera, e não depois do turno.** O modelo guarda estado
+entre blocos — é assim que ele reconhece uma palavra que atravessa vários. O
+que sobra nesse estado no fim de um turno é **a resposta que o próprio aparelho
+acabou de falar**. Reaproveitá-lo é o caminho mais curto para ele acordar com a
+própria voz.
+
+**Desligado por padrão**, e por um motivo específico: os modelos que vêm
+prontos são `alexa`, `hey_jarvis`, `hey_mycroft` e `hey_rhasspy`. Um aparelho
+que atende por "hey jarvis" quando se chama Ideraldinho é pior que um aparelho
+sem wake word — ele ensina o usuário a palavra errada.
+
+**O threshold não é um número do código.** Depende do microfone, da distância e
+da sala. `python -m scripts.wake` mostra a pontuação ao vivo e conta ativações
+por hora, que é como se acha o corte e como se mede o critério de aceite.
+
+**Consequências:**
+- Wake word quebrado é um aparelho **sem** wake word, nunca um aparelho que não
+  sobe: o modelo que não carrega devolve `False`, e o laço volta a ouvir direto.
+- `openwakeword` entra no `requirements.txt` do dispositivo. **Não** entra no do
+  gateway — lá não há microfone (D13).
+- O `onnxruntime` é reaproveitado do Piper, em vez do `tflite`: um segundo
+  runtime na Pi por um modelo de 200 KB seria caro pelo motivo errado.
+
+**Revisar esta decisão quando:** existir o modelo do "Ideraldinho" e um
+microfone para medir. Aí o número que interessa — falso positivo por hora —
+finalmente pode ser obtido, e o threshold deixa de ser 0,5 por falta de dado.

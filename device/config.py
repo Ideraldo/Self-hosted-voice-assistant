@@ -51,6 +51,17 @@ class DeviceConfig:
     stt_model_dir: str = os.getenv("STT_MODEL_DIR", "lab/models/faster-whisper")
     # Quanto silencio encerra a fala. A secao 11 orca 200-300 ms; na pratica
     # cortar cedo demais decepa o fim da frase.
+    # Palavra de ativacao (Fase 7). Desligada por padrao enquanto o modelo do
+    # "Ideraldinho" nao existe: os modelos que vem prontos com o openWakeWord
+    # sao "alexa", "hey jarvis" e afins, e acordar o aparelho chamando por
+    # outro nome seria pior que nao ter wake word nenhum.
+    wake_enabled: bool = os.getenv("WAKE_ENABLED", "0").strip().lower() in {"1", "true", "on"}
+    # Nome de um modelo que vem no pacote, ou o caminho de um .onnx proprio.
+    wake_model: str = os.getenv("WAKE_MODEL", "hey_jarvis")
+    # O numero que so a sala real define: alto demais nao acorda, baixo demais
+    # acorda com a televisao. 0.5 e o ponto de partida do openWakeWord, e
+    # `python -m scripts.wake` existe para acha-lo ouvindo.
+    wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.5"))
     vad_silence_ms: int = int(os.getenv("VAD_SILENCE_MS", "700"))
     vad_aggressiveness: int = int(os.getenv("VAD_AGGRESSIVENESS", "3"))
     simulated_latency_ms: int = int(os.getenv("SIMULATED_LATENCY_MS", "0"))

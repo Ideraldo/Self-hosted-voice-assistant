@@ -10,6 +10,9 @@ numpy
 webrtcvad
 # webrtcvad ainda importa pkg_resources, removido no setuptools 81
 setuptools<81
+# palavra de ativacao (D30). Roda o modelo por onnxruntime, que o Piper ja
+# traz -- nao entra no requirements-gateway: la nao ha microfone (D13).
+openwakeword
 
 # dev
 pytest

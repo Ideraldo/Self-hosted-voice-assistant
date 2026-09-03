@@ -87,6 +87,14 @@ class Microphone:
             log.debug("overflow na captura")
         return bytes(frame)
 
+    def read_frame(self) -> bytes:
+        """Um frame de 30 ms, cru. É por aqui que o wake word ouve.
+
+        O `listen` grava uma fala inteira e só volta no fim; a ativação precisa
+        do contrário -- olhar o áudio passando, sem se comprometer com nada.
+        """
+        return self._read()
+
     def _flush(self) -> None:
         """Descarta o que entrou enquanto o Ideraldinho falava.
 

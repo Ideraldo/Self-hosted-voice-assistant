@@ -92,6 +92,24 @@ async def listen_and_transcribe(microphone: Microphone, stt, machine: StateMachi
     return text
 
 
+async def esperar_ativacao(microphone: Microphone, wake) -> None:
+    """Fica ouvindo até alguém dizer o nome. Bloqueia o turno, e é o ponto.
+
+    Roda numa thread pela mesma razão que a captura e a síntese: o laço de
+    eventos tem que continuar atendendo o socket enquanto o aparelho espera --
+    inclusive porque um alarme pode disparar no meio da espera, e ele não pede
+    licença ao wake word.
+    """
+
+    def _ouvir() -> None:
+        while not wake.feed(microphone.read_frame()):
+            pass
+
+    print("  [esperando o nome...]", end="", flush=True)
+    await asyncio.to_thread(_ouvir)
+    print("\r                        \r", end="", flush=True)
+
+
 async def handle_incoming(
     client: GatewayClient, machine: StateMachine, voice, speaker, falando, services
 ) -> None:
@@ -177,6 +195,20 @@ async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
         )
         print(f"\rstt: {stt.name}      ")
 
+    # A palavra de ativação é opcional em dois níveis: desligada por
+    # configuração, ou ligada e o modelo não carrega. Nos dois casos o aparelho
+    # sobe e ouve direto, como sempre fez -- ele só deixa de esperar o nome.
+    wake = None
+    if not text_mode and config.wake_enabled:
+        from device.activation import WakeWord
+
+        candidato = WakeWord(config.wake_model, threshold=config.wake_threshold)
+        if candidato.carregar():
+            wake = candidato
+            print(f"wake word: {config.wake_model} (threshold {config.wake_threshold})")
+        else:
+            print("wake word: nao carregou -- ouvindo direto")
+
     with Speaker(voice.sample_rate, config.output_device) as speaker:
         # Um alarme não espera o turno acabar, mas também não fala por cima da
         # resposta: o cadeado serializa a placa de som entre o agendador e o
@@ -212,7 +244,8 @@ async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
                         aggressiveness=config.vad_aggressiveness,
                     ) as microphone:
                         await voice_loop(
-                            client, machine, microphone, stt, voice, speaker, services, falando
+                            client, machine, microphone, stt, voice, speaker,
+                            services, falando, wake,
                         )
         finally:
             await scheduler.stop()
@@ -327,8 +360,16 @@ async def text_loop(client, machine, voice, speaker, services, falando) -> None:
         await answer(client, machine, voice, speaker, services, falando, text)
 
 
-async def voice_loop(client, machine, microphone, stt, voice, speaker, services, falando) -> None:
+async def voice_loop(
+    client, machine, microphone, stt, voice, speaker, services, falando, wake=None
+) -> None:
     while True:
+        if wake is not None:
+            # O reset é antes da espera, e não depois do turno: o modelo guarda
+            # estado entre blocos, e o que sobrou ali é a resposta que o próprio
+            # aparelho acabou de falar.
+            wake.reset()
+            await esperar_ativacao(microphone, wake)
         text = await listen_and_transcribe(microphone, stt, machine)
         if not text:
             continue
