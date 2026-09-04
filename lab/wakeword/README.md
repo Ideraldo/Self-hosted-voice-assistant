@@ -75,6 +75,33 @@ mas a única forma de saber quanto sobra é rodar em fluxo, com o refratário
 ligado, como o `device/` roda. É o que `medir.py` faz, e é a única métrica aqui
 que fala a língua do critério de aceite da Fase 7: **falso positivo por hora**.
 
+## Os dois erros que valem mais que o modelo
+
+**v1 aprendeu `-aldinho`, não `Ideraldinho`.** Disparava em 83% dos
+"Everaldinho" e em 0% dos "Ideraldo" — o nome do dono da casa, que divide o
+começo inteiro. Ele decidia pelo fim da palavra. Nenhum ajuste de threshold
+conserta isso: de 0,30 para 0,95 o falso positivo por hora só caiu de 101 para
+71. O conserto foi mudar o que se ensina — a lista de adversárias foi de 6 para
+31 nomes, com a família `-aldinho` densa.
+
+**v2 trouxe um campeão novo: "Ideraudinho", em 94%.** E esse não era erro do
+modelo. O espeak fonemiza as duas palavras igual:
+
+```
+Ideraldinho    ˌideɾaʊdʒˈiɲʊ
+Ideraudinho    ˌideɾaʊdʒˈiɲʊ
+```
+
+É a mesma palavra — o "l" antes de consoante vira /w/ em português. Eu a tinha
+posto entre os negativos por *parecer* diferente no papel, e o modelo recebeu o
+mesmo som rotulado das duas formas. **A lista foi escrita olhando letra; o
+modelo ouve fonema.** `conferir_fonemas()` roda antes de gerar qualquer coisa e
+recusa a lista se isso acontecer de novo.
+
+**v3:** acorda em 94,1% das chamadas, e zero falso positivo em 44 minutos de
+fala comum e ruído. O que ainda engana são nomes inventados que diferem por um
+fonema — "Ideraldina", "Iberaldinho" — que ninguém diz.
+
 ## O que nada disto substitui
 
 O microfone. Tudo aqui é áudio sintético tocado em memória, sem placa de som,

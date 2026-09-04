@@ -92,7 +92,10 @@ ADVERSARIAS = [
     "Grinaldinho",
     "Arnaldinho",
     "Ronaldinho",
-    "Ideraudinho",
+    # "Ideraudinho" estava aqui, e era um bug: o espeak devolve
+    # `ˌideɾaʊdʒˈiɲʊ` para ela E para "Ideraldinho" -- a mesma cadeia, letra por
+    # letra. Treinar com ela era mandar o modelo chamar o mesmo som de positivo
+    # e de negativo. `conferir_fonemas()` existe para isso nao voltar.
     "Iderauzinho",
     "Iderandinho",
     "Iberaldinho",
@@ -126,6 +129,36 @@ PROSODIA = [
     (1.0, 0.9, 1.0),
     (0.95, 0.5, 0.6),
 ]
+
+
+def conferir_fonemas() -> None:
+    """Nenhuma adversária pode soar exatamente como o nome.
+
+    Parece paranoia e não é: "Ideraudinho" passou nesta lista escrita à mão, e o
+    espeak a fonemiza igualzinho a "Ideraldinho". O modelo treinado com ela
+    recebia o mesmo som rotulado como positivo e como negativo, e o resultado
+    foi ela acordar o aparelho em 94% das vezes -- que é o comportamento certo
+    para um som que É o nome, e que ninguém teria explicado sem olhar os
+    fonemas.
+
+    Escrita como palavra é um teste ruim; fonema é o que o modelo ouve.
+    """
+    from piper.phonemize_espeak import EspeakPhonemizer
+
+    p = EspeakPhonemizer()
+
+    def fonemas(texto: str) -> str:
+        return "".join("".join(x) for x in p.phonemize("pt-br", texto))
+
+    alvo = fonemas(PALAVRA)
+    iguais = [a for a in ADVERSARIAS if fonemas(a) == alvo]
+    if iguais:
+        raise SystemExit(
+            "adversarias que soam identicas a "
+            f"{PALAVRA!r} ({alvo}): {iguais}"
+            + chr(10)
+            + "  tire-as da lista -- treinar com elas ensina o modelo a se contradizer"
+        )
 
 
 def carregar_voz(nome: str):
@@ -302,14 +335,36 @@ def main() -> None:
     p.add_argument("--trechos-por-gravacao", type=int, default=3)
     p.add_argument("--ruidos", type=int, default=400)
     p.add_argument("--semente", type=int, default=7)
+    # A geracao leva mais de dez minutos e ja foi interrompida no meio uma vez.
+    # Os positivos raramente mudam; quem muda e a lista de adversarias, porque e
+    # nela que se corrige o que o modelo aprendeu errado (D31).
+    p.add_argument("--so", choices=["tudo", "positivos", "negativos"], default="tudo")
     args = p.parse_args()
 
+    conferir_fonemas()
     rng = random.Random(args.semente)
     print(f"gerando em {SAIDA}/ ...")
-    pos = gerar_positivos(rng, args.positivos_por_voz)
-    neg = gerar_adversarios(rng, args.adversarios_por_voz)
-    neg += gerar_fala_real(rng, args.trechos_por_gravacao)
-    neg += gerar_silencio(rng, args.ruidos)
+    pos = neg = 0
+    if args.so in ("tudo", "positivos"):
+        pos = gerar_positivos(rng, args.positivos_por_voz)
+    else:
+        pos = len(list((SAIDA / "positivo").glob("*.wav")))
+        print(f"  (mantendo {pos} positivos)")
+    if args.so in ("tudo", "negativos"):
+        for antigo in (SAIDA / "negativo").glob("*.wav"):
+            antigo.unlink()
+        neg = gerar_adversarios(rng, args.adversarios_por_voz)
+        neg += gerar_fala_real(rng, args.trechos_por_gravacao)
+        neg += gerar_silencio(rng, args.ruidos)
+    else:
+        neg = len(list((SAIDA / "negativo").glob("*.wav")))
+        print(f"  (mantendo {neg} negativos)")
+    # O cache de embeddings vale para o conjunto antigo. Deixa-lo para tras
+    # seria treinar em cima do dataset que acabou de ser substituido.
+    cache = SAIDA / "embeddings.npz"
+    if cache.exists():
+        cache.unlink()
+        print("  (cache de embeddings invalidado)")
     print(f"\npositivos: {pos}   negativos: {neg}   razao 1:{neg / max(pos, 1):.1f}")
 
 

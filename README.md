@@ -392,8 +392,21 @@ that is the voice near the microphone all day.
 
 Only the classifier is trained; the embedding extractor is frozen and shared
 with the bundled models. That is why 3k examples do the job of the recipe's tens
-of thousands. Details, and the declared weakness (no real room noise in the
-dataset), in `lab/wakeword/README.md` and D31.
+of thousands.
+
+Where it landed after three rounds: wakes on 94.1% of calls, and **zero false
+positives across 44 minutes** of ordinary speech and noise. That is not the same
+as "under 1/hour" -- zero events in 44 minutes only bounds the rate at roughly
+4/hour, and the dataset has no real room noise in it. The number that settles it
+comes from the microphone.
+
+Both wrong turns are worth reading, because neither was a tuning problem. v1
+learned `-aldinho` instead of `Ideraldinho` -- it fired on "Everaldinho" 83% of
+the time and on "Ideraldo", the owner's own name, never. And one "adversarial"
+word in the training set, "Ideraudinho", turned out to be phonetically identical
+to the wake word (`ˌideɾaʊdʒˈiɲʊ` for both): the list had been written by looking
+at letters, and the model hears phonemes. `conferir_fonemas()` now refuses such
+a list before generating anything. Details in `lab/wakeword/README.md` and D31.
 
 ## Choosing STT and TTS
 

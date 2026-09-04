@@ -1526,6 +1526,53 @@ ocupando a maior parte, e mais quatro palavras do outro lado da fronteira
 errado. O dataset deixa de parecer a vida real de propósito: o que ele precisa é
 ser denso exatamente onde o modelo errava.
 
+### E o segundo erro foi melhor que o primeiro
+
+Corrigida a lista, o modelo v2 melhorou onde devia — "Everaldinho" caiu de 83%
+para 53%, "Reginaldinho" de 63% para 18% — e apareceu um campeão novo:
+**"Ideraudinho", acordando o aparelho em 94% das vezes.**
+
+Só que "Ideraudinho" não é um erro do modelo. O espeak fonemiza as duas
+palavras exatamente igual:
+
+```
+Ideraldinho    ˌideɾaʊdʒˈiɲʊ
+Ideraudinho    ˌideɾaʊdʒˈiɲʊ
+```
+
+**É a mesma palavra.** Escrita diferente, som idêntico — o "l" antes de
+consoante vira /w/ em português, então "-raldi-" e "-raudi-" são a mesma coisa.
+Eu a tinha posto na lista de negativos justamente por *parecer* parecida no
+papel. O modelo recebeu o mesmo som rotulado como positivo e como negativo, e
+acertou os dois rótulos que dava para acertar: acordou.
+
+O modelo estava certo. A lista é que estava errada — e ela foi escrita olhando
+letra, quando o que o modelo ouve é fonema.
+
+O conserto é uma função de dez linhas, `conferir_fonemas()`, que roda antes de
+gerar qualquer coisa e recusa a lista se alguma adversária fonemizar igual ao
+nome. Testada pondo o homófono de volta.
+
+### Onde parou
+
+| | v1 | v2 | v3 |
+|---|---|---|---|
+| acorda quando chamado | 97,0% | — | **94,1%** |
+| Everaldinho | 82,9% | 53,1% | 51,0% |
+| Reginaldinho | 62,9% | 18,4% | **2,0%** |
+| Ideraldo (o nome do dono) | 0% | 0% | 2,0% |
+| fala comum + ruído | 2,72/h | 2,72/h | **0 em 44 min** |
+
+O que ainda engana são nomes que eu inventei para serem difíceis e que diferem
+do nome por um fonema só — "Ideraldina", "Iberaldinho", "Inderaldinho". Ninguém
+diz essas palavras. As que uma casa diz de verdade — "que horas são", "cadê
+você", "liga a televisão", e o próprio "Ideraldo" — não acordam o aparelho.
+
+**E "0,00 por hora" é uma frase que não se pode dizer.** Zero eventos em 44
+minutos não prova taxa abaixo de 1 por hora: pela regra dos três, o que esses
+dados sustentam é um teto de ~4 por hora. O número certo a escrever é **"zero em
+44 minutos"**, e o número que decide continua sendo o do microfone.
+
 **Revisar esta decisão quando:** houver microfone. Se o falso positivo real for
 alto, o primeiro conserto **não** é treinar mais: é gravar ruído da casa e
 refazer o dataset com ele — porque é exatamente a peça que falta.
