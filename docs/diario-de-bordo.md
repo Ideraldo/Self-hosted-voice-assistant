@@ -1930,18 +1930,264 @@ que lê o relógio por dentro só pode ser testada no horário em que ela funcio
 bug no despertador — havia um teste que só era verdade de manhã.*
 
 ---
+## Dia 8 — O rosto, o nome, e um modelo que aprendeu a palavra errada
+
+*Esta entrada foi escrita cinco dias depois, a partir dos commits e dos diffs do
+dia 3. Os números e as falhas são os que ficaram registrados; as impressões que
+normalmente abrem cada seção aqui estão de fora, porque eu não as escrevi na
+hora. Fica o registro de que documentar no dia seguinte já é tarde.*
+
+Foi o dia mais cheio até aqui: seis commits, quatro assuntos, e o único deles que
+eu achei que seria simples foi o que consumiu o dia.
+
+### O rosto, e a parte que não era do rosto
+
+A Fase 4 é uma página web local com quatro estados animados — `idle`,
+`listening`, `thinking`, `speaking`. O desenho não foi o problema. O problema é
+que o estado mora no dispositivo e a página mora no navegador, e o fio entre os
+dois é um WebSocket que pode cair enquanto ninguém olha.
+
+Verificado rodando: os quatro estados animam, os dois temas sobem, o rosto apaga
+quando o servidor morre e volta sozinho quando ele volta ([D27](decisions.md)).
+O renderizador ficou trocável de propósito — quando houver display na Pi, o que
+muda é quem desenha, não quem decide o estado.
+
+### A busca lendo a página, e a medição que derrubou a própria ideia
+
+No dia 7 ficou em aberto se o trecho que o DuckDuckGo devolve basta, ou se seria
+preciso abrir a primeira página. Escrevi o Leitor: uma requisição `httpx` e um
+extrator sobre o `HTMLParser` da biblioteca padrão, sem dependência nova e sem
+framework de RAG ([D25](decisions.md)).
+
+Duas coisas que a rede ensinou, medidas naquele dia:
+
+- **Fingir ser navegador não compra nada.** `httpx` cru, um User-Agent de
+  Firefox, um de Chrome e um nome honesto entraram nos mesmos quatro sites de
+  cinco, e levaram 403 dos mesmos. Ficou o nome do aparelho.
+- **A Wikipedia recusa raspagem e manda usar a API dela** — e era metade das
+  falhas, justo nas perguntas de conhecimento, que são a razão de a busca
+  existir. Com o caminho da API a leitura foi de 4/10 para 10/10, mediana
+  0,62 s. A API também exige uma URL de contato no User-Agent: sem ela, 403.
+
+E aí a medição derrubou a premissa. Quatro perguntas, o mesmo modelo, com e sem
+a página:
+
+| | trecho de 400 chars | página inteira |
+|---|---|---|
+| respondeu as quatro | sim | sim |
+| custo somado ao turno | — | +1 a 3 s |
+
+A página acrescentou **vocabulário, não resposta**, num turno que já levava 7 a
+12 s. Então ela foi escrita, testada e **desligada por padrão**
+(`SEARCH_READ_PAGE=1` liga), esperando a pergunta que a justifique
+([D28](decisions.md)).
+
+*Lição para o vídeo: o trabalho não foi desperdiçado, mas o resultado dele foi
+uma variável de ambiente em `0`. Medir depois de construir dói; medir antes teria
+me poupado o dia — só que eu não tinha como medir sem construir.*
+
+De quebra, a busca ganhou os **30 testes que nunca teve**: ela estava em uso,
+testada só à mão.
+
+### Marcos vira Ideraldinho
+
+O aparelho é uma cópia do dono da voz — o TTS já é um fine-tune dela — e "Marcos"
+era só o nome que o repositório recebeu no dia 1. Um diminutivo do meu próprio
+nome diz o que a coisa é.
+
+Mas o motivo técnico é outro, e ele é que definiu a hora da troca: **cinco
+sílabas e uma palavra que não existe em mais nada** são as duas coisas que
+separam um wake word de um gerador de falso positivo. Por isso a renomeação veio
+**antes** de treinar o modelo, e não depois.
+
+27 arquivos, 238 testes passando. O que **não** foi renomeado, de propósito: a
+[D8](decisions.md), que é o registro de uma decisão antiga e não uma afirmação
+sobre o presente; a passagem do dia 1 aqui neste diário, onde o nome Marcos foi
+escolhido, porque aquilo aconteceu; e a URL do repositório, que continua
+`Marcos-AI` ([D29](decisions.md)).
+
+### O encanamento do wake word, onde o difícil não era o modelo
+
+`device/activation/` com o openWakeWord, modelo trocável, ligado no laço de voz
+antes do `listen_and_transcribe`. 17 testes, nenhum precisando de microfone.
+1,0 ms por frame de 30 ms, RTF 0,033 — a folga para a Pi é aritmética, não
+medição.
+
+As três coisas que deram trabalho não têm nada a ver com aprendizado de máquina:
+
+- **juntar frames de 30 ms** (o que o `webrtcvad` aceita) em blocos de 1280
+  amostras (o que o openWakeWord exige) sem perder amostra na emenda. Perda ali
+  não aparece em teste nenhum — aparece numa taxa de acerto pior, sem explicação;
+- **o refratário**, senão a mesma palavra abre três turnos;
+- **o reset ANTES da espera, e não depois do turno.** O estado que sobra no
+  modelo no fim de um turno é a resposta que o aparelho acabou de falar.
+  Reaproveitá-lo é o caminho mais curto para ele acordar com a própria voz.
+
+Veio desligado por padrão: o que acompanha o openWakeWord é `alexa` e
+`hey_jarvis`, e um aparelho que atende por outro nome é pior que um sem wake word
+([D30](decisions.md)).
+
+### O modelo aprendeu a palavra errada
+
+A receita oficial do openWakeWord quer dezenas de milhares de positivos gerados
+de um checkpoint LibriTTS **em inglês**, mais dezenas de GB de negativos. O
+checkpoint inglês diria "Ideraldinho" com fonemas ingleses, e o modelo aprenderia
+a palavra errada — o pior tipo de defeito, porque treina bem, mede bem, e só
+falha na sala.
+
+Aqui já havia coisa melhor no disco: sete vozes pt-BR do Piper, as épocas do
+fine-tune da minha voz, e as 315 gravações reais do dataset — que são o negativo
+mais difícil que existe para este caso, porque são a voz que fica perto do
+microfone o dia inteiro.
+
+**Susto pelo caminho.** A primeira conferência de pronúncia foi mandar o Whisper
+transcrever o que o Piper tinha gerado, e ele devolveu `Hidraudinho`. Parecia o
+Piper errando. Não era — o mesmo Whisper errou "que horas são" em quatro das
+cinco vozes. O juiz é que estava ruim. Quem confirma o que importa é o espeak.
+
+E então a medição em fluxo derrubou o v1:
+
+| | falsos positivos por hora |
+|---|---|
+| v1, threshold 0,30 | 101 |
+| v1, threshold 0,95 | 71 |
+| critério de aceite | menos de 1 |
+
+Subir o threshold levou de 101 para 71: **ele disparava com confiança, não por
+pouco.** A quebra por palavra disse o resto:
+
+| palavra adversária | dispara |
+|---|---|
+| Everaldinho | 83% |
+| Reginaldinho | 63% |
+| Geraldinho | 43% |
+| **Ideraldo** (o meu nome) | **0%** |
+
+O modelo aprendeu `-aldinho` e ignora o começo da palavra. Sem a fita adversária,
+só fala real e ruído, são 2,7/hora.
+
+*É por isso que `medir.py` existe separado de `treinar.py`: a precisão por janela
+que o treino reporta (0,967) engana em uma ordem de grandeza, porque em uso o
+modelo vê 45 mil janelas por hora, não 390.*
+
+O conserto não era treinar mais tempo, era **mudar o que se ensina**: a lista de
+adversárias foi de 6 para 20 nomes, com a família `-aldinho` ocupando a maior
+parte ([D31](decisions.md)).
+
+### O erro que estava na minha lista, e não no modelo
+
+Corrigida a família `-aldinho`, o v2 trouxe um campeão novo: **"Ideraudinho"**,
+acordando o aparelho em 94% das vezes. Passei um tempo achando que o modelo ainda
+estava frouxo.
+
+Não estava. O espeak fonemiza "Ideraldinho" e "Ideraudinho" **exatamente igual** —
+`ideraudjinyu` nos dois — porque em português o *l* antes de consoante vira /w/.
+**É a mesma palavra.**
+
+Eu a tinha posto entre as negativas por *parecer* diferente no papel. O modelo
+recebeu o mesmo som rotulado como positivo e como negativo, e acordou — que é o
+comportamento **certo** para um som que É o nome. A lista foi escrita olhando
+letra; o modelo ouve fonema.
+
+`conferir_fonemas()` agora roda antes de gerar qualquer coisa e recusa a lista se
+alguma adversária fonemizar igual ao nome. Testada pondo o homófono de volta.
+
+O v3: **94,1% de acerto e zero falso positivo em 44 minutos** de fala comum e
+ruído. O que ainda engana são nomes que eu inventei e que diferem por um fonema
+só — "Ideraldina", "Iberaldinho" —, que ninguém diz. "Ideraldo" caiu para 2%.
+
+E **"0,00 por hora" é uma frase que não se pode dizer**: zero eventos em 44
+minutos sustenta um teto de ~4/hora, não um piso. O número que decide continua
+sendo o do microfone e da sala reais ([D31](decisions.md)).
+
+*Lição para o vídeo: duas vezes no mesmo dia o erro estava no medidor, não no
+medido. O Whisper julgando a pronúncia do Piper, e a minha lista de palavras
+julgando o que é "diferente". Um modelo que treina bem e falha na sala quase
+sempre foi ensinado com uma régua errada.*
+
+---
+## Dia 9 — Onze ferramentas de música, e o README que virou biblioteca
+
+Cinco dias sem tocar no código, e o dia começou com o `git status` mostrando oito
+arquivos modificados e cinco documentos novos que nunca foram commitados. Antes
+de qualquer coisa: 283 testes, todos passando.
+
+### O tipo, e o aparelho tocando errado com convicção
+
+O Spotify tinha seis ferramentas e todas assumiam a mesma coisa: o que você pede
+é uma **faixa**. Então "toca minha playlist de treino" virava uma busca por uma
+*música* chamada "minha playlist de treino".
+
+O que faz isso ser grave é o comportamento da API: **o Spotify sempre devolve
+alguma coisa.** Não dá erro, não devolve lista vazia — devolve a faixa menos ruim
+que encontrou. O aparelho tocava a música errada anunciando que tinha acertado.
+
+> Errar calado é o pior modo de falhar num aparelho que só fala.
+
+É o mesmo defeito da [D22](decisions.md), o modelo dizendo ter pausado sem
+pausar, com outra roupa. A busca ganhou `tipo` — música, álbum, artista, playlist
+—, e a regra correspondente entrou no system prompt, incluindo a parte de mandar
+**só o nome**, sem as palavras "playlist", "álbum", "disco" nem "minha", que o
+modelo insistia em enfiar na busca ([D32](decisions.md)).
+
+### O escopo estava no código, e precisava estar no token
+
+A segunda dúvida do dia foi mais sutil, e ela é sobre **mentir para o usuário**.
+
+As ferramentas novas de playlist exigem escopos que a autorização antiga não
+pediu. Um token autorizado meses atrás não os tem — e o que o gateway veria seria
+um **403**, que é exatamente o mesmo código que o Spotify devolve para uma conta
+sem Premium. O aparelho diria "você precisa de Premium" para quem tem Premium.
+
+A correção é pequena e o motivo é grande: o `spotify_auth` agora grava o `scope`
+ao lado do refresh token. Ele fica congelado no momento da autorização, e sem
+esse registro **não há como distinguir "essa conta não pode" de "esse token é
+velho"**. Token gravado pela versão antiga não tem o campo, e cai nos escopos
+antigos de propósito — as ferramentas novas recusam com uma frase que diz o que
+fazer, em vez de um 403 confuso.
+
+**O que não foi verificado, e é a parte honesta desta entrada:** o token que está
+no meu disco é o antigo. As cinco ferramentas novas passaram nos 81 testes, que
+rodam todos sobre HTTP falso (`httpx.MockTransport`) — **nenhuma delas tocou a
+API real**. As seis antigas foram verificadas com conta de verdade no dia 7; as
+novas não podem ser até eu reautorizar, apagando
+`gateway/data/spotify_token.json` e rodando o `spotify_auth` de novo. O comando
+está em [`lab/docs/comandos.md`](../lab/docs/comandos.md). Fica escrito aqui como
+pendência, e não como funcionalidade entregue.
+
+*O dia 7 me ensinou que a conta real acha defeito que o HTTP falso não pega — o
+403 de dois sentidos, a fila de uma música só. Escrever "funcionando" agora seria
+repetir o erro que aquele dia corrigiu.*
+
+### Quando o README deixa de caber
+
+A terceira dúvida não era técnica: **em que momento um assunto para de ser
+parágrafo do README e vira arquivo próprio?**
+
+O README tinha virado o manual inteiro — instalação, arquitetura, Spotify, nível
+0, rosto, wake word, o modelo. Quem chegava no repositório precisava atravessar
+tudo isso para descobrir o que a coisa é.
+
+O critério que usei: **um assunto sai do README quando já tem profundidade
+suficiente para afogar quem chega.** Cinco saíram — `spotify.md`, `wake-word.md`,
+`rosto.md`, `nivel-0-offline.md`, `gateway-e-modelo.md` — e o README encolheu 470
+linhas, virando porta de entrada em vez de referência.
+
+Não virou decisão numerada, porque não fecha nada e não tem consequência técnica.
+Mas é a segunda vez que o README é reescrito por auditoria — a primeira foi no
+dia 2 —, e as duas vezes o gatilho foi o mesmo: **o documento descrevia a
+intenção, e não o que existe.**
+
+---
 
 ## Onde estamos agora
 
-**O Ideraldinho me ouve, pensa, responde com a minha voz — e agora também resolve
-sozinho o que não precisa de ninguém.** Timer, alarme e hora funcionam com o
-gateway desligado e com a internet fora.
-
-**O Ideraldinho me ouve, pensa e responde com a minha voz — sem eu digitar nada.** O
-microfone captura, o VAD corta, o faster-whisper transcreve no próprio
-dispositivo, o gateway consulta o LLM e devolve a resposta frase por frase, e o
-Piper sintetiza. Pela rede sobe e desce só texto. E se o fio cair no meio, o
-aparelho volta sozinho.
+**O Ideraldinho me ouve, pensa, responde com a minha voz, mostra a cara — e
+resolve sozinho o que não precisa de ninguém.** O microfone captura, o VAD corta,
+o faster-whisper transcreve no próprio dispositivo, o gateway consulta o LLM e
+devolve a resposta frase por frase, e o Piper sintetiza. Pela rede sobe e desce
+só texto. Se o fio cair no meio, o aparelho volta sozinho. Timer, alarme e hora
+funcionam com o gateway desligado e com a internet fora.
 
 A voz oficial é a **época 996** do fine-tune v2, com 30,9 min de áudio e learning
 rate 1e-4. Medida com síntese determinística: holdout 23,8% contra 14,6% da base.
@@ -1950,7 +2196,7 @@ Fechado até aqui:
 
 | | Escolha | Por quê |
 |---|---|---|
-| Nome | Ideraldinho (D8, D29) | é uma cópia do dono da voz |
+| Nome | Ideraldinho (D8, D29) | é uma cópia do dono da voz, e um wake word melhor |
 | Arquitetura | Dois processos, WebSocket | migrar = trocar URL |
 | Rede | só texto, nos dois sentidos (D7, D13) | alguns KB por interação, e fala offline |
 | LLM | qwen3:8b via Ollama, sem raciocínio (D11, D20) | o llama3.1 não tem ferramentas e conhecimento juntos |
@@ -1965,12 +2211,18 @@ Fechado até aqui:
 | Ferramentas | agenda: declarada no gateway, executada no Pi (D18) | a execução é sempre local |
 | Spotify | declarado **e** executado no gateway (D21) | é onde mora o segredo |
 | Onde a música toca | `SPOTIFY_DEVICE`, padrão a própria Pi (D23) | ser a caixa de som, não o controle remoto |
+| Tipo da música | a busca recebe música/álbum/artista/playlist (D32) | sem isso ele tocava errado dizendo que acertou |
+| Escopo do Spotify | gravado junto com o refresh token (D32) | 403 sozinho não distingue "não pode" de "token velho" |
 | Histórico | guarda `tool_call` + resultado (D22) | sem isso o modelo para de chamar ferramenta |
 | Busca | DuckDuckGo sem chave, Brave trocável (D24) | fundamentar não pode exigir cadastro |
+| Ler a página | escrito, medido e **desligado** (D28) | o trecho já respondia; a página só somava 1 a 3 s |
 | Orquestração | as 40 linhas do `session.py` (D25) | framework esconderia a camada onde estavam os bugs |
 | Home Assistant | fora de escopo (D21) | uma lâmpada não paga Tailscale + Fase 5 |
 | Resultado de ferramenta | vai ao ar sem 2ª rodada de LLM (D18) | o modelo perdia item ao resumir |
 | Boot | sobe sem o gateway (D17) | senão o critério da Fase 2 é impossível |
+| Rosto | página web, renderizador trocável (D27) | o display da Pi troca quem desenha, não quem decide |
+| Wake word | openWakeWord, modelo próprio, **desligado por padrão** (D30) | o que vem pronto é "alexa" e "hey_jarvis" |
+| Treino do wake word | com o que já estava no disco, em pt-BR (D31) | um checkpoint inglês ensinaria a palavra errada |
 
 **Fase 0 cumprida por inteiro, e além.** O critério era o loop em dois processos;
 temos LLM real, voz própria e o STT fora do stub.
@@ -1982,8 +2234,8 @@ simulada funcionam. O container foi corrigido (D15) — imagem enxuta,
 desligada na BIOS por causa do Valorant, e sem ela não há WSL2 nem Docker
 Desktop. Na VPS é Linux, e o problema não existe.
 
-**Fase 2 entregue no essencial.** Timer, alarme, hora, listar e cancelar rodam
-no dispositivo, sem rede e sem LLM, e o aparelho liga com o gateway desligado. O
+**Fase 2 entregue no essencial.** Timer, alarme, hora, listar e cancelar rodam no
+dispositivo, sem rede e sem LLM, e o aparelho liga com o gateway desligado. O
 critério de aceite — "timer funciona com o gateway desligado" — foi verificado
 rodando, não só em teste.
 
@@ -1991,43 +2243,46 @@ Falta da Fase 2, e é escopo consciente (D17): a similaridade por **embeddings**
 que espera o log real de nível 2 dizer quais paráfrases as pessoas usam; e o
 **volume**, que depende do mixer do sistema operacional.
 
-**Fase 3 começada.** As ferramentas que voltam para o dispositivo — timer,
-alarme, listar, cancelar — funcionam ponta a ponta: o LLM entende a paráfrase que
-o regex não pega, e quem grava e dispara continua sendo o Pi (D18).
-
-**E o critério de aceite passou a ser cumprido trocando o modelo.** Com
-ferramentas declaradas o llama3.1:8b parava de responder conhecimento geral (0 de
-7). O **qwen3:8b com o raciocínio desligado** acerta 5/5 nas ferramentas e 6/7 no
+**Fase 3 entregue**, menos o Home Assistant, que ficou fora de escopo. As
+ferramentas que voltam para o dispositivo — timer, alarme, listar, cancelar —
+funcionam ponta a ponta, e quem grava e dispara continua sendo o Pi (D18). O
+critério de aceite passou a ser cumprido **trocando o modelo**: com ferramentas
+declaradas o llama3.1:8b parava de responder conhecimento geral (0 de 7); o
+**qwen3:8b com o raciocínio desligado** acerta 5/5 nas ferramentas e 6/7 no
 conhecimento, com mediana de 2,8 s (D19, D20). O qwen3:4b foi descartado por
 vazar o rascunho do raciocínio como fala.
 
-O que sobra em aberto é **fundamentação**: o 8B alucina de vez em quando — disse
-que Dom Casmurro é do Mario Quintana, uma vez em seis. É o argumento a favor da
-busca web.
-
-**Spotify funcionando com conta real.** Seis ferramentas de música, executadas
-no gateway porque é lá que mora o segredo (D21). Tocar, pular, pausar e "que
-música é essa" verificados contra a API, com `is_playing` conferido a cada passo.
-Sem credenciais no `.env` as ferramentas nem são declaradas, e o aparelho
-responde que não sabe tocar em vez de inventar chamada.
-
-A estreia com conta real achou três defeitos que o HTTP falso não pegaria: o 403
-que significa duas coisas, a fila de uma música só, e — o pior — o modelo dizendo
-ter pausado sem pausar (D22).
+**Spotify: onze ferramentas, e a metade nova ainda não viu conta real.** As seis
+primeiras — tocar, pular, pausar, "que música é essa" — foram verificadas contra
+a API com `is_playing` conferido a cada passo, e a estreia achou três defeitos
+que o HTTP falso não pegaria: o 403 que significa duas coisas, a fila de uma
+música só, e o modelo dizendo ter pausado sem pausar (D22). As **cinco novas**
+— busca por tipo, playlists, criar playlist — passam nos 81 testes sobre HTTP
+falso e **não foram exercitadas com conta real**: o token no disco é anterior aos
+escopos de playlist, e reautorizar é passo manual (D32). Sem credenciais no
+`.env` as ferramentas nem são declaradas, e o aparelho responde que não sabe
+tocar em vez de inventar chamada.
 
 **Busca na internet funcionando**, com DuckDuckGo sem chave e o Brave como troca
-de uma variável (D24). É a resposta à alucinação do D20, e as perguntas que o
-modelo recusava agora vêm respondidas e fundamentadas. Custa caro: 7 a 12 s por
-turno com busca, contra ~2 s sem. É o preço de fundamentar.
-
-**A Fase 3 está entregue**, menos o Home Assistant, que ficou fora de escopo.
+de uma variável (D24). É a resposta à alucinação do D20 — o 8B disse que *Dom
+Casmurro* é do Mario Quintana, uma vez em seis —, e as perguntas que o modelo
+recusava agora vêm respondidas e fundamentadas. Custa caro: 7 a 12 s por turno
+com busca, contra ~2 s sem. Ler a primeira página foi escrito e **medido para
+fora**: acrescentava vocabulário, não resposta (D28).
 
 Sem framework de agente e sem trocar de modelo (D25): o laço de ferramentas tem
 40 linhas e faz o que um harness faria, e foi justamente por ele estar à vista
 que a D18, a D22 e o bug do "384.400" foram encontrados.
 
-Próximo marco: **Fase 4 — o rosto**, um app web local com os quatro estados
-animados. Ou o **modo tradutor**. Nenhum dos dois depende de hardware.
+**Fase 4 entregue**, e verificada rodando: os quatro estados animam, os dois
+temas sobem, o rosto apaga quando o servidor morre e reconecta sozinho quando ele
+volta (D27).
+
+**Fase 7 quase fechada.** O encanamento está de pé e testado sem microfone (D30),
+e o modelo do "Ideraldinho" chegou ao **v3: 94,1% de acerto e zero falso positivo
+em 44 minutos** de fala e ruído gravados (D31). Falta o único número que decide:
+falso positivo por hora **com o microfone e a sala reais**. Zero em 44 minutos
+sustenta um teto de ~4/hora, não um piso.
 
 Marco seguinte, planejado: **modo tradutor portátil.** Falar português e o
 aparelho falar inglês ou chinês, e o contrário. Duas das três peças já existem —
@@ -2036,40 +2291,32 @@ o candidato é **opus-mt em CTranslate2**, que é o runtime que o `faster_whispe
 já usa. O NLLB-200 600M fica registrado como teto de comparação e
 **não-candidato no dispositivo** — autorregressivo demais para quatro núcleos
 ARM, o mesmo motivo que derrubou o LLM local no dia 1. Primeiro passo: um
-experimento em `lab/` medindo opus-mt pt↔en sobre as gravações reais. Detalhes e
-números estimados no [Dia 5](#dia-5--o-microfone-entrou-no-fio-e-o-fio-aprendeu-a-cair).
+experimento em `lab/` medindo opus-mt pt↔en sobre as gravações reais.
 
 Em aberto:
 
+- **O falso positivo por hora do wake word, com microfone.** É o critério de
+  aceite da Fase 7 e o número mais importante em aberto hoje (D30, D31).
+- **As cinco ferramentas novas do Spotify com conta real.** Exige apagar
+  `gateway/data/spotify_token.json` e reautorizar (D32).
+- **Se tudo isso cabe na Pi** — nada foi medido lá ainda, nem o Whisper. O RTF do
+  dispositivo já subiu de 0,43 para 0,6–0,9 só saindo da bancada para o código
+  real. É a maior incerteza do projeto hoje.
 - **Se o container sobe** — só se descobre na VPS (D15, D16). Se aparecer
   qualquer máquina com Docker antes disso, rodar o build ali se paga.
-- **Se tudo isso cabe na Pi** — nada foi medido lá ainda, nem o Whisper. O
-  RTF do dispositivo já subiu de 0,43 para 0,6–0,9 só saindo da bancada para o
-  código real. É a maior incerteza do projeto hoje.
-- Qual tamanho de STT cabe na Pi, quando houver Pi para medir (D9)
-- Backup privado do dataset, que hoje existe só num disco
-- **Se o trecho do buscador basta** — a busca responde com o resumo que o
-  DuckDuckGo devolve, sem abrir as páginas (D24). Se aparecer pergunta em que
-  isso não chega, o próximo passo são ~30 linhas lendo a primeira página, e não
-  um framework (D25)
 - **Se o DuckDuckGo sem chave aguenta o uso diário** — é o primeiro a sofrer
   quando o provedor aperta o cerco a automação; o Brave está pronto atrás da
-  mesma interface, e a troca é uma variável
+  mesma interface, e a troca é uma variável.
+- **Se aparece a pergunta que justifica ler a página** — está escrito e testado,
+  esperando atrás de `SEARCH_READ_PAGE=1` (D28).
+- Qual tamanho de STT cabe na Pi, quando houver Pi para medir (D9)
+- Backup privado do dataset, que hoje existe só num disco
 - Se um bloco 4 de gravações vale a pena (o `prepare --from-run` já deixa barato)
-- Se o gateway deve re-transcrever com um modelo maior — a pergunta de D1 que
-  D13 deixou sem caminho, porque o áudio não sobe mais
+- Se o gateway deve re-transcrever com um modelo maior — a pergunta de D1 que D13
+  deixou sem caminho, porque o áudio não sobe mais
 
-Ainda não começou: embeddings no roteador, volume, modo tradutor, VPS,
+Ainda não começou: embeddings no roteador, volume, modo tradutor, ducking, VPS,
 hardware.
-
-**Fase 4 entregue**, e verificada rodando: os quatro estados animam, os dois
-temas sobem, o rosto apaga quando o servidor morre e reconecta sozinho quando
-ele volta (D27).
-
-**Fase 7 começada.** O encanamento do wake word está de pé e testado sem
-microfone (D30), e o modelo do "Ideraldinho" foi treinado com as vozes pt-BR do
-Piper que já estavam aqui (D31). O que falta é o único número que decide:
-falso positivo por hora, com o microfone e a sala reais.
 
 ---
 
@@ -2109,6 +2356,25 @@ qual decisão explica o porquê.
       está marcado para acontecer na VPS, no dia do deploy — que é o pior dia
       para descobrir um erro de YAML. Qualquer notebook ou runner serve para
       antecipar isso.
+
+### Pendente de um passo manual meu
+
+- [ ] **Reautorizar o Spotify.** As cinco ferramentas novas do D32 — busca por
+      tipo, playlists, criar playlist — exigem escopos que o token no disco não
+      tem, porque ele foi autorizado antes deles existirem. Elas passam nos
+      testes sobre HTTP falso e **nunca tocaram a API real**:
+      ```
+      del gateway\data\spotify_token.json
+      py -m gateway.tools.spotify_auth
+      ```
+      Enquanto isso não acontece, elas recusam com uma frase explicando o motivo
+      ([D32](decisions.md)) — que é o comportamento certo, mas não é o mesmo que
+      estar verificado.
+- [ ] **Falso positivo por hora do wake word, com o microfone e a sala reais.**
+      É o critério de aceite da Fase 7. O v3 deu zero em 44 min de gravação, o
+      que sustenta um teto de ~4/hora e não um piso; `python -m scripts.wake`
+      mostra a pontuação ao vivo e conta ativações por hora ([D30](decisions.md),
+      [D31](decisions.md)).
 
 ### Quando houver log de uso real
 
