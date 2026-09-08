@@ -182,6 +182,32 @@ Detalhes de uso em `lab/README.md`.
 
 ---
 
+## 6b. `docs/` — o plano, as decisões, e um guia por tema
+
+```
+docs/
+  ultraplan-v3-...md      a especificação; não é reescrita
+  decisions.md            onde a construção divergiu do plano, e por quê
+  diario-de-bordo.md      a narrativa: dúvidas, tentativas, o que quebrou
+  repository-structure.md este arquivo
+  nivel-0-offline.md      timer, alarme e roteador sem rede
+  gateway-e-modelo.md     contêiner, escolha do LLM, ferramentas, busca
+  spotify.md              tipo, playlists, aparelhos, escopos
+  wake-word.md            limiar, treino, resultados
+  rosto.md                temas, estados, custo de CPU
+  voz-e-locutor.md        voz do assistente e reconhecimento de locutor
+```
+
+A divisão de trabalho entre eles: o **ultraplan** diz o que era para ser, o
+**decisions** diz o que ficou diferente e por quê, o **diário** conta como se
+chegou lá, e os guias por tema dizem como usar o que existe hoje. O `README.md`
+é só a porta de entrada — visão geral, setup, uso — e aponta para estes.
+
+Documentação de tema nova nasce aqui quando uma seção do README passa a precisar
+de mais que meia página.
+
+---
+
 ## 7. Onde colocar um arquivo novo
 
 1. Precisa existir na Pi? → `device/`
