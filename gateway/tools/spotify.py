@@ -55,6 +55,12 @@ SCOPES_ANTIGOS = "user-read-playback-state user-modify-playback-state"
 ESCOPO_LER_PLAYLIST = "playlist-read-private"
 ESCOPO_CRIAR_PLAYLIST = "playlist-modify-private"
 
+#: Quantos resultados pedir para usar **um**. Ver `_buscar_um`: com `limit=1` o
+#: Spotify devolve um item diferente e pior do que o primeiro de `limit=2`. Três
+#: dá folga para descartar os buracos que a busca de playlist devolve, sem virar
+#: uma lista para o usuário escolher -- ele continua ouvindo só o primeiro.
+LIMITE_BUSCA = 3
+
 #: O `tipo` que o modelo escolhe -> o `type` da busca do Spotify. Este de/para é
 #: pequeno e fechado de propósito: são as quatro coisas que dá para tocar. Ele
 #: não sabe nada sobre nomes de música ou de playlist, que mudam toda semana.
@@ -187,6 +193,24 @@ def _tipo_falado(busca: str, tipo: str) -> tuple[str, str]:
 #: Artigo por tipo, para a frase de "não achei" sair falável. Sem isto sai "não
 #: achei album Clube da Esquina", que soa como telegrama.
 _ARTIGO = {"musica": "a musica", "album": "o album", "artista": "o artista", "playlist": "a playlist"}
+
+
+def _parece_a_mesma(pedido: str, achado: str) -> bool:
+    """O nome achado corresponde ao pedido? Ambos já sem acento e em minúscula.
+
+    Critério: ou o pedido inteiro está no nome achado, ou **todas** as palavras
+    de peso do pedido aparecem nele. "esquenta sertanejo" casa com "Esquenta
+    Sertanejo 2026"; "playlist que nao existe 12345" não casa com "123445".
+
+    Todas, e não a maioria: com duas ou três palavras, "a maioria" é uma só, e
+    uma palavra em comum é o que faz qualquer playlist casar com qualquer nome.
+    """
+    if not pedido or not achado:
+        return False
+    if pedido in achado:
+        return True
+    palavras = [p for p in pedido.split() if len(p) > 2]
+    return bool(palavras) and all(p in achado for p in palavras)
 
 
 def _artistas(item: dict) -> str:
@@ -520,18 +544,29 @@ class SpotifyClient:
         return frase
 
     async def _buscar_um(self, busca: str, tipo: str) -> dict | None:
-        """Primeiro resultado da busca, ou None. `limit=1`: quem escolhe é o Spotify.
+        """Primeiro resultado da busca, ou None. Quem escolhe continua sendo o Spotify.
 
-        O máximo do `limit` caiu de 50 para 10 na revisão de fevereiro de 2026;
-        pedir 1 continua válido e é o que queremos -- um assistente de voz que
-        oferece cinco opções para "toca Construção" é pior que um que erra e
-        aceita "não, a outra".
+        Um assistente de voz que oferece cinco opções para "toca Construção" é
+        pior que um que erra e aceita "não, a outra" -- então usamos só o
+        primeiro item. Mas **pedimos mais que um**, e a diferença não é
+        cosmética: com `limit=1` o Spotify devolve um item *diferente* do
+        primeiro item de `limit=2`, e pior. Medido com conta real em 08/09/2026:
+
+            'Pink Floyd'        limit=1: Guns N' Roses  | limit=2: Pink Floyd
+            'Clube da Esquina'  limit=1: Construção     | limit=2: Clube Da Esquina
+
+        Ou seja: "toca Pink Floyd" tocava Guns N' Roses anunciando que acertou --
+        o mesmo defeito que o D32 existe para eliminar, sobrevivendo num
+        parâmetro. Nenhum teste sobre HTTP falso podia pegar isto, porque lá a
+        lista devolvida é a que o teste escreveu.
+
+        O máximo do `limit` caiu de 50 para 10 na revisão de fevereiro de 2026.
         """
         chave = TIPOS_BUSCA[tipo]
         r = await self._call(
             "GET",
             "/search",
-            params={"q": busca, "type": chave, "limit": 1, "market": self._market},
+            params={"q": busca, "type": chave, "limit": LIMITE_BUSCA, "market": self._market},
         )
         itens = (r.json().get(f"{chave}s") or {}).get("items") or []
         # A busca de playlist devolve buracos: posições nulas no meio da lista,
@@ -574,7 +609,17 @@ class SpotifyClient:
             if alvo and alvo in _sem_acento(p.get("name", "")):
                 return p, True
 
-        return await self._buscar_um(nome, "playlist"), False
+        # A busca pública **nunca** devolve vazio: pedir uma playlist que não
+        # existe traz a menos ruim que ela achou. Com conta real, "playlist que
+        # nao existe 12345" voltou uma playlist chamada "123445" -- e o aparelho
+        # diria "tocando a playlist 123445", que é errar calado outra vez.
+        # Então o resultado público só passa se o nome dito aparecer no nome
+        # dela. É estrito de propósito: aqui o custo de recusar é a pessoa
+        # repetir, e o de aceitar é tocar a playlist de um estranho.
+        publica = await self._buscar_um(nome, "playlist")
+        if publica and _parece_a_mesma(alvo, _sem_acento(publica.get("name", ""))):
+            return publica, False
+        return None, False
 
     async def _tocar_playlist(self, nome: str, aparelho: str | None) -> str:
         playlist, era_sua = await self._achar_playlist(nome)

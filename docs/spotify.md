@@ -99,6 +99,13 @@ variante `/users/{id}` foi removida em fevereiro de 2026, junto com
 Essa ordem é a funcionalidade inteira: existem milhares de playlists públicas
 chamadas "Treino" e nenhuma delas é a sua.
 
+E o resultado público precisa **parecer** com o que foi pedido para ser aceito: o
+nome dito tem que estar no nome dela, ou todas as suas palavras de peso têm que
+aparecer. Sem esse filtro, "toca a playlist que não existe 12345" volta uma
+playlist chamada "123445" — medido com conta real —, porque a busca pública nunca
+devolve vazio. Não achar e dizer que não achou é melhor que tocar a playlist de
+um estranho.
+
 Playlist começa embaralhada. A chamada de shuffle é solta e o erro dela é
 engolido: embaralhar é preferência, tocar é o pedido.
 
@@ -168,8 +175,27 @@ voce> pula essa                         -> Proxima.
 voce> pausa a musica                    -> Pausado.
 ```
 
-**O que ainda não foi medido com conta real:** tudo que a D32 acrescentou. Os 81
-testes do arquivo rodam contra um Spotify falso. Falta saber se o qwen3:8b
-preenche `tipo` em fala espontânea, e se o shuffle antes do `/play` sobrevive à
-ordem não garantida entre chamadas do player que a própria documentação avisa
-existir.
+A segunda, depois da D32, achou mais duas — e as duas eram a mesma doença de
+sempre, o aparelho errando calado:
+
+- **`limit=1` devolve um item diferente e pior** do que o primeiro de `limit=2`.
+  "Toca Pink Floyd" tocava Guns N' Roses. A busca pede três e usa o primeiro;
+  o teste que trava isso confere o parâmetro, porque sobre HTTP falso a lista
+  devolvida é a que o teste escreveu.
+- **a busca pública de playlist nunca diz "não achei"** — daí o filtro de
+  semelhança descrito acima.
+
+Verificado, com a faixa conferida a cada passo:
+
+| pedido | o que tocou |
+|---|---|
+| artista "Pink Floyd" | Wish You Were Here |
+| álbum "Abbey Road" | Come Together — a primeira faixa |
+| a minha playlist "A NATA" | Ascensão Sonora |
+| playlist inventada | recusou, e não trocou a música |
+| criar playlist com a atual | criada, com a faixa que tocava |
+
+**O que ainda não foi medido com conta real:** se o qwen3:8b preenche `tipo` em
+**fala espontânea** — a bancada testa o código, não o modelo —, e se o shuffle
+antes do `/play` sobrevive à ordem não garantida entre chamadas do player que a
+própria documentação avisa existir.

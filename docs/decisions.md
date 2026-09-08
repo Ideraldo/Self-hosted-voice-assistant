@@ -1666,16 +1666,53 @@ busca de 50 para 10 (o nosso é 1).
 Isso fica escrito aqui para que a ideia não volte à mesa daqui a seis meses como
 se fosse trabalho pendente.
 
-### O que não foi medido
+### O que a conta real ensinou, no mesmo dia
 
-Tudo acima está coberto por teste contra um Spotify falso: 81 testes no arquivo,
-283 na suíte, verdes. **Nada foi executado contra a conta real.** As três coisas
-que a primeira execução real ensinou da última vez (D21) não apareceriam em
-nenhum mock, e não há razão para achar que desta vez seria diferente.
+Esta seção foi escrita horas depois do resto, depois de reautorizar e rodar as
+onze ferramentas contra a conta de verdade. Dois defeitos apareceram, e nenhum
+dos dois podia aparecer num teste sobre HTTP falso.
 
-O que falta medir com conta de verdade: se o qwen3:8b preenche `tipo`
-corretamente em fala espontânea (a bancada aqui testa o código, não o modelo), e
-se o shuffle antes do `/play` sobrevive à ordem não garantida entre chamadas do
-player que a própria documentação avisa existir.
+**1. `limit=1` devolve um item diferente — e pior.** A busca pedia um resultado
+só, com a justificativa de que quem escolhe é o Spotify. A premissa está errada:
 
-**Revisar esta decisão quando:** a primeira sessão com a conta real acontecer.
+```
+'Pink Floyd'        limit=1: Guns N' Roses  | limit=2: Pink Floyd
+'Clube da Esquina'  limit=1: Construção     | limit=2: Clube Da Esquina
+'Abbey Road'        limit=1: Abbey Road (Super Deluxe) | limit=2: Abbey Road (Remastered)
+```
+
+"Toca Pink Floyd" tocava **Guns N' Roses**, anunciando que tinha acertado. É o
+mesmo defeito que esta decisão existe para eliminar, sobrevivendo num parâmetro.
+Agora pede `LIMITE_BUSCA = 3` e usa o primeiro. O teste que trava isso confere o
+parâmetro, não o resultado — sobre HTTP falso a lista é a que o teste escreveu.
+
+**2. A busca pública de playlist nunca diz "não achei".** `_achar_playlist` caía
+na busca pública quando nenhuma das suas casava, e a busca pública sempre devolve
+alguma coisa: "playlist que nao existe 12345" voltou uma playlist chamada
+**"123445"**. O resultado público agora só passa por `_parece_a_mesma` — o nome
+dito precisa estar no nome dela, ou todas as suas palavras de peso precisam
+aparecer. Todas, e não a maioria: com duas ou três palavras "a maioria" é uma só,
+e uma palavra em comum faz qualquer playlist casar com qualquer nome.
+
+Aqui o custo de recusar é a pessoa repetir; o de aceitar é tocar a playlist de um
+estranho.
+
+**O que foi verificado com conta real**, com a faixa conferida a cada passo:
+
+| pedido | o que tocou |
+|---|---|
+| artista "Pink Floyd" | Wish You Were Here |
+| álbum "Abbey Road" | Come Together — a primeira faixa |
+| a minha playlist "A NATA" | Ascensão Sonora |
+| playlist inventada | recusou, e não trocou a música |
+| criar playlist com a atual | criada, com a faixa que tocava |
+
+O `_tipo_falado` também foi conferido contra a API: "minha playlist de treino"
+vira busca por `treino` do tipo playlist, e "o album Clube da Esquina" vira
+`Clube da Esquina` do tipo álbum.
+
+Continua sem medição: se o qwen3:8b preenche `tipo` corretamente em **fala
+espontânea** — a bancada testa o código, não o modelo.
+
+**Revisar esta decisão quando:** houver log de fala espontânea suficiente
+para medir se o modelo escolhe o `tipo` certo sem eu escrever a frase.

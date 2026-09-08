@@ -20,6 +20,7 @@ from gateway.tools.spotify import (
     SPOTIFY_TOOLS,
     SpotifyClient,
     SpotifyError,
+    _parece_a_mesma,
     _tipo_falado,
     executar_spotify,
 )
@@ -60,6 +61,8 @@ class FakeSpotify:
         self.ultima_busca: str | None = None
         #: ultimo `type` mandado ao /search
         self.ultimo_tipo: str | None = None
+        #: ultimo `limit` mandado ao /search -- pedir 1 traz item pior (D32)
+        self.ultimo_limite: str | None = None
         #: por tipo de busca, o que o Spotify "tem". None = nao achou nada.
         self.catalogo: dict[str, list] = {
             "track": [FAIXA],
@@ -103,6 +106,7 @@ class FakeSpotify:
             return httpx.Response(201, json={})
         if path.endswith("/search"):
             self.ultima_busca = request.url.params.get("q")
+            self.ultimo_limite = request.url.params.get("limit")
             tipo = request.url.params.get("type")
             self.ultimo_tipo = tipo
             # `self.busca` continua mandando nas faixas, para os testes antigos.
@@ -792,3 +796,78 @@ class TestEscopoAntigo:
         # Sobrescrever o arquivo inteiro faria a primeira renovação derrubar
         # todas as playlists, semanas depois e longe da causa.
         assert dados == {"refresh_token": "refresh-novo", "scope": SCOPES}
+
+
+class TestOLimiteDaBusca:
+    """Com `limit=1` o Spotify devolve um item diferente e pior.
+
+    Medido com conta real em 08/09/2026: "Pink Floyd" com limit=1 voltava Guns
+    N' Roses, e com limit=2 voltava Pink Floyd. O HTTP falso nao reproduz isso --
+    aqui a lista e a que o teste escreveu --, entao o que da para travar e o
+    parametro, que e onde estava o defeito.
+    """
+
+    @pytest.mark.asyncio
+    async def test_pede_mais_de_um_resultado(self, fake):
+        api, client = fake
+        await client.tocar("Pink Floyd", "artista")
+        assert api.ultimo_limite is not None
+        assert int(api.ultimo_limite) > 1
+
+    @pytest.mark.asyncio
+    async def test_mas_so_o_primeiro_vai_ao_ar(self, fake):
+        api, client = fake
+        api.catalogo["artist"] = [
+            {"uri": "spotify:artist:1", "name": "Pink Floyd"},
+            {"uri": "spotify:artist:2", "name": "Guns N' Roses"},
+        ]
+        resposta = await client.tocar("Pink Floyd", "artista")
+        # Um assistente de voz que oferece opcoes e pior que um que erra e
+        # aceita "nao, a outra".
+        assert "Pink Floyd" in resposta
+        assert "Guns" not in resposta
+
+
+class TestPlaylistQueNaoExiste:
+    """A busca publica nunca devolve vazio, e por isso nao pode decidir sozinha.
+
+    Com conta real, "playlist que nao existe 12345" voltou uma playlist chamada
+    "123445". O aparelho diria "tocando a playlist 123445" -- errar calado.
+    """
+
+    @pytest.mark.asyncio
+    async def test_nome_sem_relacao_e_recusado(self, fake):
+        api, client = fake
+        api.catalogo["playlist"] = [{"uri": "spotify:playlist:x", "id": "x", "name": "123445"}]
+        resposta = await client.tocar("playlist que nao existe 12345", "playlist")
+        assert "Nao achei" in resposta
+
+    @pytest.mark.asyncio
+    async def test_nome_parecido_ainda_toca(self, fake):
+        api, client = fake
+        api.catalogo["playlist"] = [
+            {"uri": "spotify:playlist:x", "id": "x", "name": "Esquenta Sertanejo 2026"}
+        ]
+        # Recusar isto seria trocar um erro por outro: e a playlist certa.
+        assert "Esquenta Sertanejo 2026" in await client.tocar("esquenta sertanejo", "playlist")
+
+    @pytest.mark.asyncio
+    async def test_a_sua_continua_ganhando_da_publica(self, fake):
+        api, client = fake
+        assert "sua playlist Treino" in await client.tocar("Treino", "playlist")
+
+
+class TestPareceAMesma:
+    @pytest.mark.parametrize(
+        "pedido,achado,esperado",
+        [
+            ("treino", "treino", True),
+            ("esquenta sertanejo", "esquenta sertanejo 2026", True),
+            ("playlist que nao existe 12345", "123445", False),
+            ("relaxa man", "relaxa", False),  # falta uma palavra de peso
+            ("", "qualquer coisa", False),
+            ("treino", "", False),
+        ],
+    )
+    def test_criterio(self, pedido, achado, esperado):
+        assert _parece_a_mesma(pedido, achado) is esperado

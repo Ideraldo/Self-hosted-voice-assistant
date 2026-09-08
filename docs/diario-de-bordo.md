@@ -2146,18 +2146,77 @@ velho"**. Token gravado pela versão antiga não tem o campo, e cai nos escopos
 antigos de propósito — as ferramentas novas recusam com uma frase que diz o que
 fazer, em vez de um 403 confuso.
 
-**O que não foi verificado, e é a parte honesta desta entrada:** o token que está
-no meu disco é o antigo. As cinco ferramentas novas passaram nos 81 testes, que
-rodam todos sobre HTTP falso (`httpx.MockTransport`) — **nenhuma delas tocou a
-API real**. As seis antigas foram verificadas com conta de verdade no dia 7; as
-novas não podem ser até eu reautorizar, apagando
-`gateway/data/spotify_token.json` e rodando o `spotify_auth` de novo. O comando
-está em [`lab/docs/comandos.md`](../lab/docs/comandos.md). Fica escrito aqui como
-pendência, e não como funcionalidade entregue.
+Quando escrevi isto, as cinco ferramentas novas tinham passado nos 81 testes
+sobre HTTP falso e **nenhuma delas tinha tocado a API real** — o token no meu
+disco era anterior aos escopos de playlist. Deixei registrado como pendência, e
+não como funcionalidade entregue, porque o dia 7 já tinha me ensinado que a conta
+real acha defeito que o mock não pega.
 
-*O dia 7 me ensinou que a conta real acha defeito que o HTTP falso não pega — o
-403 de dois sentidos, a fila de uma música só. Escrever "funcionando" agora seria
-repetir o erro que aquele dia corrigiu.*
+Aí eu reautorizei, no mesmo dia. E ela achou dois.
+
+### O `limit=1`, e o Pink Floyd que tocava Guns N' Roses
+
+A busca pedia um resultado só. O comentário no código dizia, com todas as
+letras: *"`limit=1`: quem escolhe é o Spotify."* Escrevi isso achando que era
+uma economia elegante.
+
+```
+'Pink Floyd'        limit=1: Guns N' Roses  | limit=2: Pink Floyd
+'Clube da Esquina'  limit=1: Construção     | limit=2: Clube Da Esquina
+'Abbey Road'        limit=1: Abbey Road (Super Deluxe) | limit=2: Abbey Road (Remastered)
+```
+
+**Pedindo um, o Spotify devolve outro — e pior.** Não é o primeiro da lista de
+dois; é um item diferente. Então "toca Pink Floyd" tocava Guns N' Roses,
+anunciando que tinha acertado.
+
+Isso é exatamente o defeito que eu tinha passado o dia consertando, a três
+parágrafos daqui, sobrevivendo dentro de um parâmetro que eu nunca desconfiei.
+Agora pede três e usa o primeiro.
+
+*E é a definição de um bug que teste nenhum meu podia pegar: sobre
+`httpx.MockTransport` a lista devolvida é a que eu escrevi no teste. O mock
+concorda comigo por construção.* O teste de regressão trava o **parâmetro**, que
+é onde estava o erro, e não o resultado, que eu não controlo.
+
+### A playlist que não existe, e a "123445"
+
+O segundo é mais sutil. Quando nenhuma das minhas playlists casa, o código cai na
+busca pública — o que atende "toca a playlist Esquenta Sertanejo". Só que **a
+busca pública nunca devolve vazio.** Pedi "playlist que nao existe 12345" e
+recebi uma playlist chamada **"123445"**.
+
+O aparelho diria "tocando a playlist 123445". Errar calado, de novo, e pela
+terceira vez no mesmo dia.
+
+O resultado público agora passa por um critério de semelhança: o nome dito
+precisa estar no nome dela, ou todas as palavras de peso precisam aparecer.
+**Todas**, e não a maioria — com duas ou três palavras, "a maioria" é uma só, e
+uma palavra em comum faz qualquer playlist casar com qualquer nome. Aqui o custo
+de recusar é eu repetir; o de aceitar é tocar a playlist de um estranho.
+
+### O que passou, com conta de verdade
+
+Conferindo a faixa a cada passo, que é a disciplina que o [D22](decisions.md)
+deixou:
+
+| pedido | o que tocou |
+|---|---|
+| artista "Pink Floyd" | Wish You Were Here |
+| álbum "Abbey Road" | Come Together — a primeira faixa, como manda o D32 |
+| a minha playlist "A NATA" | Ascensão Sonora |
+| playlist inventada | recusou, e **não trocou** a música |
+| criar playlist com a atual | criada, com a faixa que tocava |
+
+E o `listar_playlists`, que é a ferramenta que só existe por causa do escopo
+novo: *"Você tem 50 playlists. As primeiras: My top tracks playlist, My Playlist
+#69, Relaxa man, A NATA…"*
+
+*Lição para o vídeo: eu escrevi na entrada de hoje que não ia chamar de
+"funcionando" aquilo que só o mock tinha visto. Duas horas depois, a conta real
+me deu dois motivos concretos para essa frase existir — e o segundo deles era o
+mesmo erro que eu acabara de consertar, escondido num parâmetro. O mock não
+mente; ele só concorda com quem o escreveu.*
 
 ### Quando o README deixa de caber
 
@@ -2252,16 +2311,20 @@ declaradas o llama3.1:8b parava de responder conhecimento geral (0 de 7); o
 conhecimento, com mediana de 2,8 s (D19, D20). O qwen3:4b foi descartado por
 vazar o rascunho do raciocínio como fala.
 
-**Spotify: onze ferramentas, e a metade nova ainda não viu conta real.** As seis
-primeiras — tocar, pular, pausar, "que música é essa" — foram verificadas contra
-a API com `is_playing` conferido a cada passo, e a estreia achou três defeitos
-que o HTTP falso não pegaria: o 403 que significa duas coisas, a fila de uma
-música só, e o modelo dizendo ter pausado sem pausar (D22). As **cinco novas**
-— busca por tipo, playlists, criar playlist — passam nos 81 testes sobre HTTP
-falso e **não foram exercitadas com conta real**: o token no disco é anterior aos
-escopos de playlist, e reautorizar é passo manual (D32). Sem credenciais no
-`.env` as ferramentas nem são declaradas, e o aparelho responde que não sabe
-tocar em vez de inventar chamada.
+**Spotify: onze ferramentas, todas exercitadas com conta real.** As seis
+primeiras — tocar, pular, pausar, "que música é essa" — desde o dia 7, e a
+estreia achou três defeitos que o HTTP falso não pegaria: o 403 que significa
+duas coisas, a fila de uma música só, e o modelo dizendo ter pausado sem pausar
+(D22). As cinco novas — busca por tipo, playlists, criar playlist — no dia 9, e
+acharam mais dois: `limit=1` devolvendo um item diferente e pior (o "toca Pink
+Floyd" que tocava Guns N' Roses), e a busca pública de playlist, que nunca diz
+"não achei" e voltava uma playlist qualquer para um nome inventado. Os dois
+consertados e remedidos contra a API (D32). Sem credenciais no `.env` as
+ferramentas nem são declaradas, e o aparelho responde que não sabe tocar em vez
+de inventar chamada.
+
+Continua sem medição, e é o que sobrou: se o modelo preenche o `tipo` certo em
+**fala espontânea**. A bancada testa o código; o modelo, não.
 
 **Busca na internet funcionando**, com DuckDuckGo sem chave e o Brave como troca
 de uma variável (D24). É a resposta à alucinação do D20 — o 8B disse que *Dom
@@ -2297,8 +2360,9 @@ Em aberto:
 
 - **O falso positivo por hora do wake word, com microfone.** É o critério de
   aceite da Fase 7 e o número mais importante em aberto hoje (D30, D31).
-- **As cinco ferramentas novas do Spotify com conta real.** Exige apagar
-  `gateway/data/spotify_token.json` e reautorizar (D32).
+- **Se o modelo escolhe o `tipo` certo em fala espontânea.** As onze ferramentas
+  já foram exercitadas com conta real; o que falta medir é o modelo escolhendo
+  entre música, álbum, artista e playlist sem eu escrever a frase (D32).
 - **Se tudo isso cabe na Pi** — nada foi medido lá ainda, nem o Whisper. O RTF do
   dispositivo já subiu de 0,43 para 0,6–0,9 só saindo da bancada para o código
   real. É a maior incerteza do projeto hoje.
@@ -2359,17 +2423,13 @@ qual decisão explica o porquê.
 
 ### Pendente de um passo manual meu
 
-- [ ] **Reautorizar o Spotify.** As cinco ferramentas novas do D32 — busca por
-      tipo, playlists, criar playlist — exigem escopos que o token no disco não
-      tem, porque ele foi autorizado antes deles existirem. Elas passam nos
-      testes sobre HTTP falso e **nunca tocaram a API real**:
+- [x] ~~**Reautorizar o Spotify.**~~ Feito em 08/09/2026, e a conta real achou
+      dois defeitos no mesmo dia ([D32](decisions.md)). Se um dia os escopos
+      mudarem de novo, o caminho é o mesmo:
       ```
-      del gateway\data\spotify_token.json
+      rm gateway/data/spotify_token.json   # cmd: del gateway\data\spotify_token.json
       py -m gateway.tools.spotify_auth
       ```
-      Enquanto isso não acontece, elas recusam com uma frase explicando o motivo
-      ([D32](decisions.md)) — que é o comportamento certo, mas não é o mesmo que
-      estar verificado.
 - [ ] **Falso positivo por hora do wake word, com o microfone e a sala reais.**
       É o critério de aceite da Fase 7. O v3 deu zero em 44 min de gravação, o
       que sustenta um teto de ~4/hora e não um piso; `python -m scripts.wake`
