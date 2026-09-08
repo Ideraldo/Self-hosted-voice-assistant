@@ -34,6 +34,7 @@ Set-Alias py .\.venv\Scripts\python.exe
 | Rodar o assistente | `py -m uvicorn gateway.main:app` + `py -m device.main` |
 | Testar o nível 0 sem gateway | `py -m device.main --text` (sem subir o gateway) |
 | Autorizar o Spotify (uma vez) | `py -m gateway.tools.spotify_auth` |
+| Reautorizar depois de mudar `SCOPES` (D32) | apagar `gateway/data/spotify_token.json` e rodar o comando acima |
 
 ---
 

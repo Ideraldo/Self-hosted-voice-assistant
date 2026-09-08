@@ -15,10 +15,12 @@ import httpx
 import pytest
 
 from gateway.tools.spotify import (
+    SCOPES,
     SPOTIFY_DISPATCH,
     SPOTIFY_TOOLS,
     SpotifyClient,
     SpotifyError,
+    _tipo_falado,
     executar_spotify,
 )
 
@@ -28,6 +30,17 @@ FAIXA = {
     "artists": [{"name": "Chico Buarque"}],
     "album": {"uri": "spotify:album:9", "name": "Construcao"},
 }
+
+ALBUM = {
+    "uri": "spotify:album:9",
+    "name": "Construcao",
+    "artists": [{"name": "Chico Buarque"}],
+}
+
+ARTISTA = {"uri": "spotify:artist:7", "name": "Chico Buarque"}
+
+PLAYLIST_PUBLICA = {"uri": "spotify:playlist:pub", "id": "pub", "name": "Esquenta Sertanejo"}
+MINHA_PLAYLIST = {"uri": "spotify:playlist:eu", "id": "eu", "name": "Treino"}
 
 
 class FakeSpotify:
@@ -45,6 +58,21 @@ class FakeSpotify:
         self.corpo_play: dict = {}
         #: ultimo `q` mandado ao /search, para conferir o que foi procurado
         self.ultima_busca: str | None = None
+        #: ultimo `type` mandado ao /search
+        self.ultimo_tipo: str | None = None
+        #: por tipo de busca, o que o Spotify "tem". None = nao achou nada.
+        self.catalogo: dict[str, list] = {
+            "track": [FAIXA],
+            "album": [ALBUM],
+            "artist": [ARTISTA],
+            "playlist": [PLAYLIST_PUBLICA],
+        }
+        #: as playlists da conta, devolvidas por /me/playlists
+        self.minhas = [MINHA_PLAYLIST]
+        #: estado do shuffle pedido, e o corpo do POST de criacao
+        self.shuffle: str | None = None
+        self.playlist_criada: dict | None = None
+        self.itens_adicionados: list[str] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -62,9 +90,24 @@ class FakeSpotify:
             return httpx.Response(self.status, json=self.erro_body or {"error": {}})
         if path.endswith("/me/player/devices"):
             return httpx.Response(200, json={"devices": self.devices})
+        if path.endswith("/me/player/shuffle"):
+            self.shuffle = request.url.params.get("state")
+            return httpx.Response(204)
+        if path.endswith("/me/playlists"):
+            if request.method == "POST":
+                self.playlist_criada = json.loads(request.content)
+                return httpx.Response(201, json={"id": "nova", "uri": "spotify:playlist:nova"})
+            return httpx.Response(200, json={"items": self.minhas})
+        if path.endswith("/items") and request.method == "POST":
+            self.itens_adicionados += json.loads(request.content)["uris"]
+            return httpx.Response(201, json={})
         if path.endswith("/search"):
             self.ultima_busca = request.url.params.get("q")
-            return httpx.Response(200, json={"tracks": {"items": self.busca}})
+            tipo = request.url.params.get("type")
+            self.ultimo_tipo = tipo
+            # `self.busca` continua mandando nas faixas, para os testes antigos.
+            itens = self.busca if tipo == "track" else self.catalogo.get(tipo, [])
+            return httpx.Response(200, json={f"{tipo}s": {"items": itens}})
         if path.endswith("/currently-playing"):
             if self.tocando is None:
                 return httpx.Response(204)
@@ -85,8 +128,20 @@ def fake(monkeypatch, tmp_path):
     monkeypatch.setattr(httpx.AsyncClient, "__init__", patched)
 
     token_path = tmp_path / "spotify_token.json"
-    token_path.write_text(json.dumps({"refresh_token": "refresh-abc"}), encoding="utf-8")
+    token_path.write_text(
+        json.dumps({"refresh_token": "refresh-abc", "scope": SCOPES}), encoding="utf-8"
+    )
     return api, SpotifyClient("id", "secret", token_path)
+
+
+@pytest.fixture
+def fake_token_antigo(fake, tmp_path):
+    """O mesmo cliente, com o token de quem autorizou antes das playlists."""
+    api, client = fake
+    (tmp_path / "spotify_token.json").write_text(
+        json.dumps({"refresh_token": "refresh-abc"}), encoding="utf-8"
+    )
+    return api, client
 
 
 class TestAutorizacao:
@@ -524,3 +579,216 @@ class TestSessaoSemSpotify:
         sessao = Session(websocket=None, llm=None, expected_token="x", spotify=client)
         nomes = {t.name for t in sessao._tools}
         assert {"tocar_musica", "criar_timer"} <= nomes
+
+
+class TestTipoFalado:
+    """A rede de segurança de quando o modelo não preenche `tipo`.
+
+    Cada caso aqui é uma frase que, antes, virava busca por uma **faixa** com
+    aquele nome inteiro -- e o Spotify sempre devolve alguma faixa.
+    """
+
+    @pytest.mark.parametrize(
+        "frase, esperado",
+        [
+            ("minha playlist de treino", ("treino", "playlist")),
+            ("a playlist esquenta", ("esquenta", "playlist")),
+            ("o disco Clube da Esquina", ("Clube da Esquina", "album")),
+            ("a banda Los Hermanos", ("Los Hermanos", "artista")),
+            ("Construcao", ("Construcao", "musica")),
+        ],
+    )
+    def test_deduz_o_tipo_da_frase(self, frase, esperado):
+        assert _tipo_falado(frase, "musica") == esperado
+
+    def test_a_escolha_do_modelo_ganha_da_deducao(self):
+        # Ele viu a frase inteira; aqui só há substring.
+        assert _tipo_falado("playlist", "artista") == ("playlist", "artista")
+
+    def test_nao_come_preposicao_do_meio_do_nome(self):
+        # O "de" só cai colado na palavra removida. Sem essa regra a limpeza
+        # devolvia "Chico Buarque Hollanda".
+        assert _tipo_falado("a banda Chico Buarque de Hollanda", "musica")[0] == (
+            "Chico Buarque de Hollanda"
+        )
+
+    def test_artigo_depois_do_tipo_e_parte_do_nome(self):
+        assert _tipo_falado("o disco A Noite", "musica") == ("A Noite", "album")
+
+
+class TestTocarPorTipo:
+    @pytest.mark.asyncio
+    async def test_artista_toca_no_contexto_do_artista(self, fake):
+        api, client = fake
+        resposta = await client.tocar("Chico Buarque", "artista")
+        assert api.ultimo_tipo == "artist"
+        assert api.corpo_play == {"context_uri": "spotify:artist:7"}
+        # `offset` só vale para álbum e playlist -- com artista o Spotify
+        # responde 400. Este assert existe para que ninguém "unifique" os
+        # corpos depois.
+        assert "offset" not in api.corpo_play
+        assert resposta == "Tocando Chico Buarque."
+
+    @pytest.mark.asyncio
+    async def test_album_comeca_do_inicio(self, fake):
+        api, client = fake
+        resposta = await client.tocar("Construcao", "album")
+        assert api.corpo_play == {"context_uri": "spotify:album:9"}
+        assert "album Construcao" in resposta
+
+    @pytest.mark.asyncio
+    async def test_musica_ainda_toca_no_contexto_do_album(self, fake):
+        api, client = fake
+        await client.tocar("Construcao", "musica")
+        # O comportamento medido que não pode regredir: com `uris` a fila teria
+        # um item só e o primeiro "próxima" acabava em silêncio.
+        assert api.corpo_play == {
+            "context_uri": "spotify:album:9",
+            "offset": {"uri": "spotify:track:1"},
+        }
+
+    @pytest.mark.asyncio
+    async def test_tipo_inventado_pelo_modelo_cai_no_padrao(self, fake):
+        api, client = fake
+        await executar_spotify(client, "tocar_musica", {"busca": "Construcao", "tipo": "faixa"})
+        # `type=faixa` seria 400 do Spotify, e a pessoa ouviria um erro cru.
+        assert api.ultimo_tipo == "track"
+
+    @pytest.mark.asyncio
+    async def test_nao_achou_diz_o_que_procurou(self, fake):
+        api, client = fake
+        api.catalogo["album"] = []
+        # "Não achei nada" não diz se o nome está errado ou o tipo.
+        assert await client.tocar("Xis", "album") == "Nao achei o album Xis no Spotify."
+
+
+class TestPlaylists:
+    @pytest.mark.asyncio
+    async def test_a_playlist_da_conta_ganha_da_publica(self, fake):
+        api, client = fake
+        resposta = await client.tocar("treino", "playlist")
+        # Existem mil playlists públicas chamadas "Treino"; a da pessoa é uma.
+        assert api.corpo_play == {"context_uri": "spotify:playlist:eu"}
+        assert "sua playlist Treino" in resposta
+
+    @pytest.mark.asyncio
+    async def test_cai_na_busca_publica_quando_nao_e_sua(self, fake):
+        api, client = fake
+        resposta = await client.tocar("Esquenta Sertanejo", "playlist")
+        assert api.ultimo_tipo == "playlist"
+        assert api.corpo_play == {"context_uri": "spotify:playlist:pub"}
+        assert "a playlist Esquenta Sertanejo" in resposta
+
+    @pytest.mark.asyncio
+    async def test_playlist_comeca_embaralhada(self, fake):
+        api, client = fake
+        await client.tocar("treino", "playlist")
+        assert api.shuffle == "true"
+
+    @pytest.mark.asyncio
+    async def test_shuffle_recusado_nao_impede_a_musica(self, fake):
+        api, client = fake
+
+        async def recusa(method, path, **kwargs):
+            if path.endswith("/shuffle"):
+                raise SpotifyError("nao deu")
+            return await original(method, path, **kwargs)
+
+        original = client._call
+        client._call = recusa
+        # Embaralhar é preferência; tocar é o pedido. Trocar um pelo outro seria
+        # o aparelho se recusando a tocar por causa de um detalhe.
+        assert "Tocando" in await client.tocar("treino", "playlist")
+
+    @pytest.mark.asyncio
+    async def test_playlist_que_nao_existe_e_dita_como_playlist(self, fake):
+        api, client = fake
+        api.minhas = []
+        api.catalogo["playlist"] = []
+        resposta = await client.tocar("treino", "playlist")
+        # O bug antigo: isto tocava uma faixa qualquer chamada "treino" e
+        # anunciava sucesso.
+        assert resposta == "Nao achei nenhuma playlist chamada treino."
+
+    @pytest.mark.asyncio
+    async def test_busca_de_playlist_ignora_buracos_na_lista(self, fake):
+        api, client = fake
+        api.minhas = []
+        api.catalogo["playlist"] = [None, PLAYLIST_PUBLICA]
+        # A busca de playlist devolve posições nulas; `["uri"]` nelas explode.
+        assert "Esquenta" in await client.tocar("Esquenta", "playlist")
+
+    @pytest.mark.asyncio
+    async def test_lista_longa_nao_e_lida_inteira(self, fake):
+        api, client = fake
+        api.minhas = [{"id": str(i), "uri": f"u{i}", "name": f"Lista {i}"} for i in range(40)]
+        resposta = await client.listar_playlists()
+        assert "40 playlists" in resposta
+        assert "Lista 39" not in resposta
+
+
+class TestCriarPlaylist:
+    @pytest.mark.asyncio
+    async def test_nasce_privada(self, fake):
+        api, client = fake
+        await client.criar_playlist("Domingo")
+        # A API cria pública se ninguém disser nada. Publicar no perfil de
+        # alguém por omissão não é um padrão que se escolheria.
+        assert api.playlist_criada == {
+            "name": "Domingo",
+            "public": False,
+            "description": "Criada pelo Ideraldinho.",
+        }
+
+    @pytest.mark.asyncio
+    async def test_guarda_a_musica_que_esta_tocando(self, fake):
+        api, client = fake
+        resposta = await client.criar_playlist("Domingo", adicionar_atual=True)
+        assert api.itens_adicionados == ["spotify:track:1"]
+        assert "com Construcao" in resposta
+
+    @pytest.mark.asyncio
+    async def test_sem_nada_tocando_a_playlist_ainda_e_criada(self, fake):
+        api, client = fake
+        api.tocando = None
+        resposta = await client.criar_playlist("Domingo", adicionar_atual=True)
+        assert api.itens_adicionados == []
+        assert "nao tinha nada tocando" in resposta
+
+    @pytest.mark.asyncio
+    async def test_sem_nome_nao_chama_a_api(self, fake):
+        api, client = fake
+        assert "falhou" in await executar_spotify(client, "criar_playlist", {"nome": " "})
+        assert api.playlist_criada is None
+
+
+class TestEscopoAntigo:
+    """Quem autorizou antes das playlists tem token válido e escopo velho."""
+
+    @pytest.mark.asyncio
+    async def test_diz_que_precisa_reautorizar_em_vez_de_403(self, fake_token_antigo):
+        _, client = fake_token_antigo
+        resposta = await executar_spotify(client, "listar_playlists", {})
+        # Sem isto viria um 403, que este código traduziria como "precisa de
+        # Premium" -- dito em voz alta a quem já tem Premium.
+        assert "autorizado de novo" in resposta
+
+    @pytest.mark.asyncio
+    async def test_tocar_musica_continua_funcionando(self, fake_token_antigo):
+        _, client = fake_token_antigo
+        assert "Tocando" in await client.tocar("Construcao", "musica")
+
+    @pytest.mark.asyncio
+    async def test_playlist_publica_ainda_toca(self, fake_token_antigo):
+        api, client = fake_token_antigo
+        # Ler as suas exige escopo; tocar uma pública, não. A falta de escopo não
+        # pode derrubar o que não depende dele.
+        assert "Esquenta Sertanejo" in await client.tocar("Esquenta Sertanejo", "playlist")
+
+    def test_renovar_o_token_nao_apaga_o_escopo(self, fake, tmp_path):
+        api, client = fake
+        client._save_refresh("refresh-novo")
+        dados = json.loads((tmp_path / "spotify_token.json").read_text(encoding="utf-8"))
+        # Sobrescrever o arquivo inteiro faria a primeira renovação derrubar
+        # todas as playlists, semanas depois e longe da causa.
+        assert dados == {"refresh_token": "refresh-novo", "scope": SCOPES}

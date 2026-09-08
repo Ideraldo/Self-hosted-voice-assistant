@@ -122,14 +122,22 @@ def main() -> int:
         print(f"Troca do codigo falhou ({r.status_code}): {r.text[:200]}")
         return 1
 
-    token = r.json().get("refresh_token")
+    payload = r.json()
+    token = payload.get("refresh_token")
     if not token:
         print("O Spotify nao devolveu refresh_token.")
         return 1
 
+    # O escopo vai para o disco junto com o token. Ele fica congelado no momento
+    # da autorização, e sem esse registro não há como o gateway distinguir "essa
+    # conta não pode" de "esse token é velho" -- ele veria só um 403 e diria à
+    # pessoa que ela precisa de Premium, que ela já tem.
     destino = Path(config.spotify_token_path)
     destino.parent.mkdir(parents=True, exist_ok=True)
-    destino.write_text(json.dumps({"refresh_token": token}, indent=2), encoding="utf-8")
+    destino.write_text(
+        json.dumps({"refresh_token": token, "scope": payload.get("scope") or SCOPES}, indent=2),
+        encoding="utf-8",
+    )
     print(f"Pronto. Token guardado em {destino} (fora do git).")
     print("Suba o gateway de novo para ele carregar as ferramentas do Spotify.")
     return 0

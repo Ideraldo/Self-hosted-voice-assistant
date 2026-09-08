@@ -1576,3 +1576,106 @@ dados sustentam é um teto de ~4 por hora. O número certo a escrever é **"zero
 **Revisar esta decisão quando:** houver microfone. Se o falso positivo real for
 alto, o primeiro conserto **não** é treinar mais: é gravar ruído da casa e
 refazer o dataset com ele — porque é exatamente a peça que falta.
+
+---
+
+## D32 — A música ganha tipo, e a API do Spotify decide o que é possível
+
+**Data:** 2026-09-04
+**O plano diz:** seção 9 lista "controle de música (Spotify)" sem detalhar o que
+o controle inclui. A seção 13 já avisava para validar os endpoints na
+documentação atual, "houve remoção em fev/2026".
+
+**O que mudou:** `tocar_musica` passa a exigir um campo `tipo` — `musica`,
+`album`, `artista` ou `playlist` —, playlists entram (ler, tocar, criar), e
+entra o modo aleatório. São onze ferramentas de música, contra seis.
+
+### Por que o tipo era o buraco
+
+Toda busca era `type=track`. Pedir um **artista** achava uma faixa qualquer dele
+e tocava o álbum *daquela* faixa — que podia ser um ao vivo de 1999. Funcionava
+por acidente, e o acidente era audível.
+
+O caso feio, porém, era outro: "toca minha playlist de treino" virava busca por
+uma **faixa** chamada "minha playlist de treino". O Spotify sempre devolve
+alguma coisa, então o aparelho tocava música aleatória anunciando que tinha
+acertado. É o mesmo padrão do bug do campo `aparelho` (o texto que não é o que
+parece indo parar dentro da busca), e o mesmo remédio: reconhecer o que não se
+sabe servir e dizer isso.
+
+Três corpos de `/play`, e nenhum intercambiável: música toca no contexto do
+álbum com `offset`; álbum toca do começo; artista toca como `context_uri` puro,
+porque a documentação diz que `offset` só vale para álbum e playlist. Há um teste
+que existe só para impedir que alguém "unifique" isso depois.
+
+### Um de/para pequeno, e por que não um grande
+
+`_tipo_falado` recupera o tipo das palavras da própria frase quando o modelo
+deixa o padrão. O conjunto é **fechado**: quatro palavras de tipo, como o
+`TIPOS_FALADOS` dos aparelhos é fechado porque só existem seis tipos de
+aparelho.
+
+A tabela que **não** foi feita é a de nomes de playlist. Nome de playlist é
+conjunto aberto e muda toda semana; uma tabela dessas apodrece em silêncio e o
+defeito aparece meses depois. Quem desambigua nome é o modelo, com a frase
+inteira na frente — e o enum no schema é o canal para isso.
+
+### Playlists: a ordem é a funcionalidade
+
+As **suas** primeiro (`/me/playlists`), busca pública só depois. Existem
+milhares de playlists públicas chamadas "Treino" e nenhuma delas é a sua. A
+variante `/users/{id}/playlists` foi removida em fevereiro de 2026 junto com
+`Get User's Profile`; a `/me` sobreviveu, e é a única que enxerga playlist
+privada.
+
+Playlist criada nasce **privada**. A API cria pública quando ninguém diz nada, e
+publicar no perfil de alguém por omissão não é um padrão que se escolheria se
+alguém perguntasse.
+
+**Ressalva registrada:** criar playlist por voz continua sendo interação ruim —
+nomear, escolher o que entra, confirmar. Entrou porque foi pedido explicitamente
+depois dessa ressalva, e `adicionar_atual` existe para que o pedido real
+("guarda essa música") tenha resposta, já que a playlist nasce vazia.
+
+### O escopo é gravado no token, não no código
+
+Mudar a constante `SCOPES` não muda nada sozinho: o escopo congela no refresh
+token no momento da autorização. Um token de antes das playlists continua
+válido, com o escopo velho, e as chamadas novas voltam **403** — que este código
+traduzia como "precisa de Premium", dito em voz alta para quem tem Premium.
+
+Agora o escopo concedido vai para o disco junto com o token, e o cliente confere
+antes de chamar. Token sem esse campo é de uma versão anterior e assume-se o
+escopo antigo, que é o que ele de fato tem. `_save_refresh` passou a preservar o
+resto do arquivo: sobrescrevê-lo inteiro faria a primeira renovação apagar o
+registro do escopo e derrubar todas as playlists semanas depois, longe da causa.
+
+**Para reautorizar:** apagar `gateway/data/spotify_token.json` e rodar
+`py -m gateway.tools.spotify_auth`.
+
+### O que a Spotify decidiu que não dá
+
+Rádio, estação e "toca algo parecido com isso" **não são possíveis**. Em
+27/11/2024 a Spotify desligou `recommendations`, `related-artists`,
+`audio-features` e `audio-analysis` para apps novos: 403 no mesmo dia, sem fila
+de espera e sem caminho de exceção. Este app é novo. Fevereiro de 2026 levou
+mais um pedaço, incluindo `Get Artist's Top Tracks` — que a rota do
+`context_uri` de artista torna desnecessário — e derrubou o teto do `limit` da
+busca de 50 para 10 (o nosso é 1).
+
+Isso fica escrito aqui para que a ideia não volte à mesa daqui a seis meses como
+se fosse trabalho pendente.
+
+### O que não foi medido
+
+Tudo acima está coberto por teste contra um Spotify falso: 81 testes no arquivo,
+283 na suíte, verdes. **Nada foi executado contra a conta real.** As três coisas
+que a primeira execução real ensinou da última vez (D21) não apareceriam em
+nenhum mock, e não há razão para achar que desta vez seria diferente.
+
+O que falta medir com conta de verdade: se o qwen3:8b preenche `tipo`
+corretamente em fala espontânea (a bancada aqui testa o código, não o modelo), e
+se o shuffle antes do `/play` sobrevive à ordem não garantida entre chamadas do
+player que a própria documentação avisa existir.
+
+**Revisar esta decisão quando:** a primeira sessão com a conta real acontecer.

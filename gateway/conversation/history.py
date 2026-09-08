@@ -23,6 +23,15 @@ SYSTEM_PROMPT = (
     "correspondente. NUNCA diga que fez algo sem ter chamado a ferramenta, e "
     "nunca responda sobre o que esta tocando agora pelo que foi dito antes na "
     "conversa: consulte a ferramenta, porque a musica pode ter mudado. "
+    # Sem esta regra o modelo deixava `tipo` no padrão e "toca minha playlist de
+    # treino" virava busca por uma **faixa** chamada "minha playlist de treino".
+    # O Spotify sempre devolve alguma coisa, então o aparelho tocava a música
+    # errada anunciando que tinha acertado. Errar calado é o pior modo de falhar
+    # num aparelho que só fala.
+    "Ao tocar musica, diga sempre o tipo do que foi pedido -- musica, album, "
+    "artista ou playlist -- e mande no nome apenas o nome, sem as palavras "
+    "'playlist', 'album', 'disco' nem 'minha'. Se a pessoa disser playlist, o "
+    "tipo e playlist, mesmo que voce nao conheca o nome dela. "
     # A busca devolve trechos de paginas, e nao uma frase pronta -- e a unica
     # ferramenta cujo resultado o modelo precisa mesmo redigir. Sem esta
     # instrucao ele le a lista numerada em voz alta, com URL e tudo.
