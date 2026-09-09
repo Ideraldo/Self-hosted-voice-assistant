@@ -1,4 +1,4 @@
-# Ideraldinho-AI — portable voice assistant
+# Ideraldinho — portable voice assistant
 
 Client-server voice assistant, built to replace a bedroom Alexa without giving
 up portability. The device listens, transcribes and speaks locally; the gateway

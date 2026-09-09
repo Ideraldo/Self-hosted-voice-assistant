@@ -1340,7 +1340,10 @@ teria ficado caro de verdade.
 - O repositório no GitHub continuou `Marcos-AI` por um tempo, e a URL dentro do
   `USER_AGENT` apontava para ele — renomear ali era ação de fora do código, e uma
   URL que não resolve seria pior que um nome velho. *(Dia 9: o repositório foi
-  renomeado para `Ideraldinho-AI`; o `remote` e o `USER_AGENT` acompanharam.)*
+  renomeado — passou por `Ideraldinho-AI` e parou em `Self-hosted-voice-assistant`,
+  que descreve o projeto para quem chega de fora. O `remote` e o `USER_AGENT`
+  acompanharam. O assistente continua se chamando Ideraldinho: o nome do
+  repositório e o nome do bicho são coisas diferentes.)*
 - O **diário fica como foi escrito** onde ele narra o dia 1 escolhendo o nome
   Marcos. Aquilo aconteceu. O resto do diário, que fala no presente, virou
   Ideraldinho.
