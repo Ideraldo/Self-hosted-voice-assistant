@@ -1,11 +1,11 @@
 ---
 name: documentar
-description: Fecha o dia de trabalho no Ideraldinho-AI atualizando a documentação. Acrescenta uma entrada narrativa ao diário de bordo (docs/diario-de-bordo.md) com o que foi feito, tentado, medido e quebrado; e propaga o que mudou para decisions.md, lab/RESULTS.md e os READMEs. Use quando o usuário pedir para documentar o dia, registrar a sessão, atualizar o diário, ou rodar /documentar.
+description: Fecha o dia de trabalho no Ideraldinho atualizando a documentação. Acrescenta uma entrada narrativa ao diário de bordo (docs/diario-de-bordo.md) com o que foi feito, tentado, medido e quebrado; e propaga o que mudou para decisions.md, lab/RESULTS.md e os READMEs. Use quando o usuário pedir para documentar o dia, registrar a sessão, atualizar o diário, ou rodar /documentar.
 ---
 
 # Documentar o dia de trabalho
 
-Esta skill fecha uma sessão de trabalho do Ideraldinho-AI escrevendo a documentação
+Esta skill fecha uma sessão de trabalho do Ideraldinho escrevendo a documentação
 correspondente. O objetivo final é o **vídeo** que o usuário vai gravar no fim do
 projeto, contando os dias, as decisões, as incertezas e as falhas.
 
