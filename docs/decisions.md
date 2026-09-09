@@ -1337,9 +1337,10 @@ teria ficado caro de verdade.
 - Um `.env` antigo com `SPOTIFY_DEVICE=Marcos` continua funcionando; só deixa de
   casar com o aparelho quando a Pi se anunciar pelo nome novo.
 - O `DEVICE_ID` mudou de padrão de novo. Continua sendo só um identificador.
-- O repositório no GitHub continua `Marcos-AI`, e a URL dentro do `USER_AGENT`
-  aponta para ele — renomear ali é ação de fora do código, e uma URL que não
-  resolve seria pior que um nome velho.
+- O repositório no GitHub continuou `Marcos-AI` por um tempo, e a URL dentro do
+  `USER_AGENT` apontava para ele — renomear ali era ação de fora do código, e uma
+  URL que não resolve seria pior que um nome velho. *(Dia 9: o repositório foi
+  renomeado para `Ideraldinho-AI`; o `remote` e o `USER_AGENT` acompanharam.)*
 - O **diário fica como foi escrito** onde ele narra o dia 1 escolhendo o nome
   Marcos. Aquilo aconteceu. O resto do diário, que fala no presente, virou
   Ideraldinho.

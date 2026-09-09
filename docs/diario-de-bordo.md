@@ -2003,8 +2003,9 @@ separam um wake word de um gerador de falso positivo. Por isso a renomeação ve
 27 arquivos, 238 testes passando. O que **não** foi renomeado, de propósito: a
 [D8](decisions.md), que é o registro de uma decisão antiga e não uma afirmação
 sobre o presente; a passagem do dia 1 aqui neste diário, onde o nome Marcos foi
-escolhido, porque aquilo aconteceu; e a URL do repositório, que continua
-`Marcos-AI` ([D29](decisions.md)).
+escolhido, porque aquilo aconteceu; e a URL do repositório, que na época ainda
+era `Marcos-AI` ([D29](decisions.md)) — só foi renomeada para `Ideraldinho-AI` no
+dia 9.
 
 ### O encanamento do wake word, onde o difícil não era o modelo
 
