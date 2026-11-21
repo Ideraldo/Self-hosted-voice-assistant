@@ -320,6 +320,15 @@ O que notar:
   um erro de ordem aparece cedo.
 - **Esperar o wake word é `IDLE`.** A máquina só sai dele quando a gravação da
   fala começa.
+- **Uma pergunta abre uma janela, e não um estado novo.** Quando o turno termina
+  numa pergunta — hoje, o "qual eu cancelo?" de um cancelamento ambíguo —, o
+  `state idle` leva `expects_reply`, e o aparelho ouve por `REPLY_WINDOW_S`
+  (8 s) sem exigir o nome. A resposta vai para quem perguntou: se foi o
+  gateway, sobe direto, sem passar pelo roteador de nível 0 — senão um
+  "cancela" cancelaria um timer. Silêncio na janela, e ele volta a esperar o
+  nome sem dizer nada. Quem liga a janela é o código que sabe que perguntou;
+  um "?" no texto do modelo não basta, ou cada "posso ajudar em mais alguma
+  coisa?" deixaria o microfone aberto.
 - **`SPEAKING → LISTENING` está na tabela e ninguém usa.** É a porta do
   barge-in; hoje o microfone descarta o que entrou enquanto o aparelho falava.
 - **Emoção é um segundo eixo, não um estado.** `set_emotion` muda o humor sem

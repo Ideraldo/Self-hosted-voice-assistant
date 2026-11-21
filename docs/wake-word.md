@@ -52,6 +52,16 @@ como o critério de aceite da fase é medido:
 
 ---
 
+### O único momento em que ele ouve sem o nome
+
+Quando o aparelho faz uma pergunta, ele ouve a resposta por `REPLY_WINDOW_S`
+segundos (padrão 8) sem esperar o wake word — é o que permite responder "o
+timer" a "qual eu cancelo?" sem repetir "Ideraldinho". Fora disso, nada muda.
+
+O que ainda não foi medido, porque exige microfone e sala: se a cauda da
+própria fala entra na janela, e o quanto uma TV ligada nesses 8 segundos vira
+"resposta". O valor é um ponto de partida, não uma calibração.
+
 ## Treinar "Ideraldinho" sem baixar a internet
 
 A receita oficial do openWakeWord quer dezenas de milhares de positivos a partir
