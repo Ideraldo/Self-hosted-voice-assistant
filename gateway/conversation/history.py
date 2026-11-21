@@ -43,7 +43,7 @@ SYSTEM_PROMPT = (
 
 
 class Conversation:
-    """A single device's rolling history, trimmed by turn count."""
+    """A single device's rolling history, trimmed by whole turns."""
 
     def __init__(self, max_turns: int = 12) -> None:
         self._max_turns = max_turns
@@ -57,24 +57,40 @@ class Conversation:
         self._turns.append(Message(role="assistant", content=text))
         self._trim()
 
-    def add_tool_call(self, name: str, args: dict) -> None:
+    def add_tool_call(self, name: str, args: dict, call_id: str) -> None:
         """Registra que o assistente **pediu** a ferramenta.
 
         Junto com `add_tool_result`, forma o par que os modelos foram treinados
         a ver. Guardar só a frase falada -- que foi o que este código fez até a
         D22 -- ensina o modelo que, nesta conversa, ação se responde com prosa:
         no turno seguinte ele dizia "Pausando a música." sem pausar nada.
+
+        O `call_id` é o que amarra o par fora do Ollama: a API da OpenAI e a da
+        Anthropic recusam um resultado que não aponta para a sua chamada.
         """
         self._turns.append(
             Message(
                 role="assistant",
                 content="",
-                tool_calls=[{"function": {"name": name, "arguments": args}}],
+                tool_calls=[{"id": call_id, "function": {"name": name, "arguments": args}}],
             )
         )
         self._trim()
 
-    def add_tool_result(self, name: str, result: str) -> None:
+    def has_tool_call(self, call_id: str) -> bool:
+        """Já existe uma chamada com este id no histórico?
+
+        Há provedor que repete id entre respostas (`call_0` em todas). Dentro de
+        uma resposta isso não confunde ninguém; num histórico de vários turnos,
+        são dois resultados apontando para a mesma chamada.
+        """
+        return any(
+            chamada.get("id") == call_id
+            for mensagem in self._turns
+            for chamada in mensagem.tool_calls or []
+        )
+
+    def add_tool_result(self, name: str, result: str, call_id: str) -> None:
         """O que a ferramenta devolveu, para o modelo formular a resposta.
 
         Entra como papel `tool` e não como `user`: o modelo precisa saber que
@@ -82,7 +98,9 @@ class Conversation:
         pessoa disse. Confundir os dois faz o modelo responder ao resultado como
         se fosse uma pergunta.
         """
-        self._turns.append(Message(role="tool", content=f"{name}: {result}"))
+        self._turns.append(
+            Message(role="tool", content=f"{name}: {result}", tool_call_id=call_id)
+        )
         self._trim()
 
     def checkpoint(self) -> list[Message]:
@@ -108,6 +126,23 @@ class Conversation:
         return [Message(role="system", content=SYSTEM_PROMPT), *self._turns]
 
     def _trim(self) -> None:
-        excess = len(self._turns) - self._max_turns * 2
-        if excess > 0:
-            del self._turns[:excess]
+        """Apara o começo do histórico, sempre na fronteira de um turno.
+
+        O orçamento continua sendo `max_turns * 2` mensagens -- a conta de
+        quando todo turno era pergunta e resposta. O que mudou é onde o corte
+        cai: contando mensagens, um turno com ferramenta (quatro ou mais) saía
+        pela metade, e o histórico passava a começar num `tool` sem a chamada,
+        ou numa resposta sem a pergunta. O Ollama engole isso; uma API de nuvem
+        devolve 400 em todos os turnos seguintes, até o pedaço sair sozinho.
+
+        Por isso o corte anda de `user` em `user`, e o turno em andamento nunca
+        sai: se ele sozinho passa do orçamento, o histórico fica só com ele.
+        """
+        limite = self._max_turns * 2
+        if len(self._turns) <= limite:
+            return
+        inicios = [i for i, m in enumerate(self._turns) if m.role == "user"]
+        if not inicios:
+            return
+        corte = next((i for i in inicios if len(self._turns) - i <= limite), inicios[-1])
+        del self._turns[:corte]

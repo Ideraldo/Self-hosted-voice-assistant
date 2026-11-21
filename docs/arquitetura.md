@@ -134,7 +134,7 @@ O que notar:
 | GatewayClient | `device/ws_client.py` | a única conexão para fora; aperto de mão e reconexão |
 | Laço do turno | `device/main.py` | amarra tudo acima; `executar_ferramenta` |
 | `/ws` + Session | `gateway/main.py`, `gateway/api/session.py` | autenticação, turno, laço de ferramentas |
-| Conversation | `gateway/conversation/history.py` | prompt de sistema e histórico aparado |
+| Conversation | `gateway/conversation/history.py` | prompt de sistema e histórico aparado por turno inteiro |
 | LLMProvider | `gateway/llm/base.py`, `gateway/llm/ollama.py` | interface + Ollama em streaming |
 | device_tools | `gateway/tools/device_tools.py` | declara as 4 ferramentas de agenda e quais são terminais |
 | spotify | `gateway/tools/spotify.py`, `spotify_auth.py` | 11 ferramentas de música, token e escopo |
@@ -342,7 +342,7 @@ flowchart TD
     FIM{"Fechou uma frase?<br/>. ! ? ou quebra de linha<br/>ponto depois de dígito não conta"}
     FLUSH["flush: state speaking na primeira vez<br/>transcript final=false"]
     TETO{"Já foram 3 rodadas<br/>de ferramenta?"}
-    DESISTE["Histórico: falhou,<br/>número máximo de tentativas"]
+    DESISTE["Desiste: a chamada não roda<br/>e não entra no histórico"]
     QUAL{"Qual ferramenta?"}
     BUSCA["executar_busca<br/>no gateway"]
     SPOT["executar_spotify<br/>no gateway"]
@@ -350,7 +350,7 @@ flowchart TD
     HIST["Histórico, sempre:<br/>add_tool_call + add_tool_result"]
     TERM{"Resultado é terminal?<br/>agenda ou Spotify"}
     FALA["flush do resultado<br/>falado como veio, sem 2a rodada"]
-    RESTO["flush do que sobrou<br/>transcript final=true<br/>add_assistant"]
+    RESTO["flush do que sobrou<br/>transcript final=true<br/>add_assistant, ou desfaz o turno<br/>se nada foi dito"]
     IDLE["state idle<br/>log dos tempos do turno"]
 
     INI --> LLM --> DELTA
@@ -382,9 +382,16 @@ O que notar:
 - **O histórico guarda o par `tool_call` + resultado, inclusive nas
   terminais.** O pedido entra como mensagem `assistant` com `tool_calls`, o
   resultado como papel `tool`. Sem isso o modelo para de chamar ferramenta no
-  turno seguinte e passa a narrar ação que não fez (D22).
+  turno seguinte e passa a narrar ação que não fez (D22). Os dois carregam o
+  mesmo id — o do provedor, ou um gerado aqui —, que é o que uma API de nuvem
+  exige para casar um com o outro. O Ollama recebe o par sem id, de propósito:
+  foi nesse formato que a D22 mediu.
+- **O histórico é aparado por turno inteiro.** Ele sempre começa num `user` e
+  nunca separa uma chamada do seu resultado.
 - **Há teto.** `MAX_TOOL_ROUNDS = 3`: no quarto pedido de ferramenta dentro do
   mesmo turno o laço desiste em vez de deixar o aparelho preso em `THINKING`.
+  A chamada que não rodou não deixa rastro; e um turno que termina sem nada
+  dito — este, ou uma resposta vazia do modelo — é desfeito por inteiro.
 - **Falha de ferramenta é texto, não exceção.** Timeout do dispositivo, erro do
   Spotify e busca fora do ar voltam como "falhou: ..." ou como uma frase
   falável.
