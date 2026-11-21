@@ -56,6 +56,18 @@ class GatewayConfig:
         "on",
         "yes",
     )
+    # App de financas, por MCP (gateway/tools/mcp_client.py). Tudo vazio por
+    # padrao: sem a URL ou sem o arquivo de token o cliente nao e construido e
+    # nenhuma ferramenta de dinheiro e declarada -- como a musica sem Spotify.
+    # O token nasce de `python -m gateway.tools.financas_auth`, no computador.
+    # CLIENT_ID so para servidor sem registro dinamico; SCOPE so se ele exigir.
+    financas_mcp_url: str = os.getenv("FINANCAS_MCP_URL", "")
+    financas_token_path: str = os.getenv("FINANCAS_TOKEN_PATH", "gateway/data/financas_token.json")
+    financas_client_id: str = os.getenv("FINANCAS_CLIENT_ID", "")
+    financas_scope: str = os.getenv("FINANCAS_SCOPE", "")
+    financas_redirect_uri: str = os.getenv(
+        "FINANCAS_REDIRECT_URI", "http://127.0.0.1:8765/callback"
+    )
     stt_api_key: str | None = os.getenv("STT_API_KEY")
     tts_api_key: str | None = os.getenv("TTS_API_KEY")
 
