@@ -29,6 +29,7 @@ CINZA = "#59636e"
 BORDA = "#d1d9e0"
 ZONA = "#f6f8fa"
 REDE = "#0969da"       # o que cruza a rede
+MCP = "#8250df"        # o que fala Model Context Protocol
 LOCAL = "#1f2328"      # o que nunca sai do aparelho
 
 MARCAS = {
@@ -38,6 +39,7 @@ MARCAS = {
     "ollama": "#1f2328",
     "spotify": "#1DB954",
     "duckduckgo": "#DE5833",
+    "modelcontextprotocol": "#8250df",
 }
 
 TEXTOS = {
@@ -54,6 +56,7 @@ TEXTOS = {
         "rosto": ("Rosto", "página web"),
         "sessao": ("Sessão", "conversa · chamadas ao LLM"),
         "ferramentas": ("Ferramentas", "música · busca · agenda"),
+        "financas": ("App de finanças", "servidor MCP · em breve"),
         "llm": ("LLM", "Ollama hoje · nuvem depois"),
         "spotify": ("Spotify", "Web API"),
         "busca": ("Busca na internet", "DuckDuckGo · Brave"),
@@ -77,6 +80,7 @@ TEXTOS = {
         "rosto": ("Face", "web page"),
         "sessao": ("Session", "conversation · LLM calls"),
         "ferramentas": ("Tools", "music · search · schedules"),
+        "financas": ("Finance app", "MCP server · coming soon"),
         "llm": ("LLM", "Ollama today · cloud next"),
         "spotify": ("Spotify", "Web API"),
         "busca": ("Web search", "DuckDuckGo · Brave"),
@@ -112,10 +116,11 @@ def texto(x, y, s, tam=13, cor=TINTA, peso=400, ancora="start") -> str:
     )
 
 
-def cartao(x, y, w, nome_icone, titulo, sub, h=74) -> str:
+def cartao(x, y, w, nome_icone, titulo, sub, h=74, tracejado=False) -> str:
+    traco = ' stroke-dasharray="6 4"' if tracejado else ""
     return "".join(
         [
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="#ffffff" stroke="{BORDA}" stroke-width="1.5"/>',
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="#ffffff" stroke="{CINZA if tracejado else BORDA}" stroke-width="1.5"{traco}/>',
             f'<rect x="{x + 14}" y="{y + 17}" width="40" height="40" rx="9" fill="{ZONA}" stroke="{BORDA}"/>',
             icone(nome_icone, x + 22, y + 25, 24),
             texto(x + 66, y + 33, titulo, 15, peso=600),
@@ -135,7 +140,7 @@ def zona(x, y, w, h, nome_icone, titulo, sub) -> str:
     )
 
 
-def seta(pontos, cor=LOCAL, grossura=1.75) -> str:
+def seta(pontos, cor=LOCAL, grossura=1.75, tracejada=False) -> str:
     """Linha em cotovelos, com cantos arredondados e ponta no fim."""
     r = 8
     d = f"M{pontos[0][0]},{pontos[0][1]}"
@@ -145,8 +150,9 @@ def seta(pontos, cor=LOCAL, grossura=1.75) -> str:
         bx = x1 + r * ((x2 > x1) - (x2 < x1)); by = y1 + r * ((y2 > y1) - (y2 < y1))
         d += f" L{ax},{ay} Q{x1},{y1} {bx},{by}"
     d += f" L{pontos[-1][0]},{pontos[-1][1]}"
-    ponta = "rede" if cor == REDE else "local"
-    return f'<path d="{d}" fill="none" stroke="{cor}" stroke-width="{grossura}" marker-end="url(#ponta-{ponta})"/>'
+    ponta = {REDE: "rede", MCP: "mcp"}.get(cor, "local")
+    traco = ' stroke-dasharray="6 4"' if tracejada else ""
+    return f'<path d="{d}" fill="none" stroke="{cor}" stroke-width="{grossura}"{traco} marker-end="url(#ponta-{ponta})"/>'
 
 
 def rotulo(x, y, s, cor=CINZA, ancora="middle") -> str:
@@ -170,18 +176,19 @@ def circulo(x, y, nome_icone, legenda) -> str:
 
 def alto_nivel(lingua: str) -> str:
     t = TEXTOS[lingua]
-    L, A = 1360, 470
+    L, A = 1360, 500
     p = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {L} {A}" width="{L}" height="{A}" '
         f'font-family="{FONTE}" role="img" aria-label="{escape(t["alt"])}">',
         "<defs>",
         f'<marker id="ponta-local" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{LOCAL}"/></marker>',
         f'<marker id="ponta-rede" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{REDE}"/></marker>',
+        f'<marker id="ponta-mcp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{MCP}"/></marker>',
         "</defs>",
         f'<rect x="0.75" y="0.75" width="{L - 1.5}" height="{A - 1.5}" rx="16" fill="#ffffff" stroke="{BORDA}" stroke-width="1.5"/>',
         # zonas
-        zona(150, 30, 460, 410, "raspberrypi", t["dispositivo"], t["dispositivo_sub"]),
-        zona(760, 30, 280, 410, "docker", t["gateway"], t["gateway_sub"]),
+        zona(150, 30, 460, 440, "raspberrypi", t["dispositivo"], t["dispositivo_sub"]),
+        zona(760, 30, 280, 440, "docker", t["gateway"], t["gateway_sub"]),
         texto(1212, 57, t["fora"], 12, CINZA, 600, "middle"),
         # o que cruza a rede (por baixo dos cartoes e da pilula)
         seta([(385, 125), (780, 125)], REDE, 2.5),
@@ -202,15 +209,22 @@ def alto_nivel(lingua: str) -> str:
         texto(289, 204, t["conhecido"], 12, CINZA, 500),
         # gateway
         cartao(780, 100, 240, "fastapi", *t["sessao"]),
-        cartao(780, 313, 240, "wrench", *t["ferramentas"]),
-        seta([(900, 174), (900, 313)]),
+        cartao(780, 296, 240, "wrench", *t["ferramentas"]),
+        seta([(900, 174), (900, 296)]),
         # fora
         cartao(1095, 100, 235, "ollama", *t["llm"]),
-        cartao(1095, 270, 235, "spotify", *t["spotify"]),
-        cartao(1095, 356, 235, "duckduckgo", *t["busca"]),
+        cartao(1095, 210, 235, "spotify", *t["spotify"]),
+        cartao(1095, 296, 235, "duckduckgo", *t["busca"]),
         seta([(1020, 137), (1095, 137)]),
-        seta([(1020, 340), (1058, 340), (1058, 307), (1095, 307)]),
-        seta([(1020, 360), (1058, 360), (1058, 393), (1095, 393)]),
+        seta([(1020, 318), (1050, 318), (1050, 247), (1095, 247)]),
+        seta([(1020, 333), (1095, 333)]),
+        # o MCP: a unica ligacao que ainda nao esta de ponta a ponta, por isso tracejada
+        seta([(1020, 348), (1050, 348), (1050, 419), (1095, 419)], MCP, 2.25, tracejada=True),
+        cartao(1095, 382, 235, "wallet", *t["financas"], tracejado=True),
+        # o selo fica montado na borda do cartao, onde o olho bate primeiro
+        f'<rect x="1252" y="370" width="66" height="24" rx="12" fill="#fbefff" stroke="{MCP}" stroke-width="1.5"/>',
+        icone("modelcontextprotocol", 1261, 375.5, 13, MCP),
+        texto(1279, 386.5, "MCP", 12, MCP, 700),
         # entrada e saida
         circulo(70, 137, "user", t["voz"]),
         circulo(70, 387, "volume-2", t["som"]),

@@ -16,7 +16,9 @@ repository was measured on one.
 
 A known command — timer, alarm, the time — never leaves the device. Everything
 else goes up as text and comes back as text: audio never crosses the network.
-Only the gateway talks to outside services.
+Only the gateway talks to outside services. The dashed box is the one link not
+yet wired end to end: the MCP client exists and is tested against a fake server;
+the expense tools on top of it are next.
 
 <details>
 <summary>The detailed view: every module in both processes</summary>

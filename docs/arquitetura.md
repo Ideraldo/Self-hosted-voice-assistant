@@ -32,6 +32,11 @@ seguintes abrem cada caixa.
 dispositivo. Todo o resto sobe como texto e volta como texto: o áudio não cruza
 a rede em nenhum dos dois sentidos. E só o gateway fala com serviços de fora.
 
+A caixa tracejada é a única ligação que ainda não está de ponta a ponta: o
+cliente MCP existe e é testado contra um servidor falso; as ferramentas de
+gasto por voz em cima dele são o próximo passo
+([próximos passos](proximos-passos.md)).
+
 ---
 
 ## 1. Visão geral

@@ -35,6 +35,8 @@ services:
       #   docker compose -f gateway/docker-compose.yml exec -T gateway \
       #       sh -c 'cat > gateway/data/spotify_token.json' \
       #       < gateway/data/spotify_token.json
+      # O token do app de financas (financas_token.json) mora no mesmo volume e
+      # entra pelo mesmo caminho.
       - gateway-data:/app/gateway/data
     restart: unless-stopped
 
