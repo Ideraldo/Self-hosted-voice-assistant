@@ -12,45 +12,7 @@ repository was measured on one.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    VOICE(["Voice"])
-
-    subgraph DEVICE["Device — at home, works offline"]
-        direction TB
-        LISTEN["Listen<br/>wake word · VAD · speech-to-text"]
-        LOCAL["Local skills<br/>timers · alarms · clock"]
-        SPEAK["Speak<br/>text-to-speech, own voice"]
-        FACE["Face<br/>web page"]
-        LISTEN -->|"known command"| LOCAL --> SPEAK
-    end
-
-    subgraph GATEWAY["Gateway — container, PC today, VPS next"]
-        direction TB
-        SESSION["Session<br/>conversation + tool loop"]
-        TOOLS["Tools<br/>music · web search · schedules"]
-        SESSION --> TOOLS
-    end
-
-    LLM["LLM<br/>Ollama today, cloud API next"]
-    SPOTIFY["Spotify"]
-    SEARCH["Web search<br/>DuckDuckGo / Brave"]
-    OUT(["Speaker + screen"])
-
-    VOICE --> LISTEN
-    LISTEN ==>|"everything else, as text"| SESSION
-    SESSION ==>|"answer, as text"| SPEAK
-    SESSION --> LLM
-    TOOLS --> SPOTIFY
-    TOOLS --> SEARCH
-    SPEAK --> OUT
-    FACE --> OUT
-
-    classDef ext fill:#fde8d0,stroke:#c2571a,color:#1a1a1a
-    classDef io fill:#eeeeee,stroke:#555555,color:#1a1a1a
-    class LLM,SPOTIFY,SEARCH ext
-    class VOICE,OUT io
-```
+<img src="docs/img/arquitetura-alto-nivel.en.svg" alt="High-level architecture: voice enters the device, known commands stay local, everything else crosses one text-only WebSocket to the gateway, which reaches the LLM, Spotify and web search" width="100%">
 
 A known command — timer, alarm, the time — never leaves the device. Everything
 else goes up as text and comes back as text: audio never crosses the network.
@@ -139,6 +101,7 @@ Start here, then follow the topic:
 | [`docs/diario-de-bordo.md`](docs/diario-de-bordo.md) | the narrative: doubts, attempts, what broke |
 | [`docs/repository-structure.md`](docs/repository-structure.md) | what each folder is for |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | the whole application in diagrams: processes, a turn, the protocol, deployment |
+| [`docs/proximos-passos.md`](docs/proximos-passos.md) | the work queue: what can move now, what waits for the VPS, the hardware or a decision |
 
 Per topic:
 
