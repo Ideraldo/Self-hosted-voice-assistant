@@ -18,6 +18,9 @@ docs/
 
 # Segredos ficam de fora da imagem; o compose injeta por env_file.
 .env
+# O refresh token do Spotify tambem e segredo, e `COPY gateway/` o levaria
+# junto. Ele entra pelo volume do compose, nunca pela imagem.
+gateway/data/
 
 *.md
 !README.md

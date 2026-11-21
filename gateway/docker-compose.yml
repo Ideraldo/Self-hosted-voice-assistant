@@ -26,4 +26,17 @@ services:
       # Docker Desktop resolve isso sozinho; no Docker Engine em Linux -- que e
       # o caso da VPS -- so existe com esta linha.
       - "host.docker.internal:host-gateway"
+    volumes:
+      # O refresh token do Spotify mora aqui. Sem volume ele morreria a cada
+      # `up --build`, e o container nao tem navegador para autorizar de novo.
+      # Para levar o token de uma maquina que ja autorizou (pelo `exec`, e nao
+      # pelo `cp`: o `cp` grava como root, e o gateway nao consegue regravar o
+      # arquivo quando o token e renovado):
+      #   docker compose -f gateway/docker-compose.yml exec -T gateway \
+      #       sh -c 'cat > gateway/data/spotify_token.json' \
+      #       < gateway/data/spotify_token.json
+      - gateway-data:/app/gateway/data
     restart: unless-stopped
+
+volumes:
+  gateway-data:

@@ -17,8 +17,13 @@ COPY common/ ./common/
 COPY gateway/ ./gateway/
 
 # O processo nao precisa de root, e um dia isso roda exposto numa VPS.
-RUN useradd --create-home --uid 1000 marcos && chown -R marcos:marcos /app
-USER marcos
+# `gateway/data` nasce aqui, ja com o dono certo: o volume do compose herda o
+# dono do diretorio da imagem, e sem isso o refresh token do Spotify nao
+# conseguiria ser regravado por um usuario que nao e root.
+RUN useradd --create-home --uid 1000 ideraldinho \
+    && mkdir -p gateway/data \
+    && chown -R ideraldinho:ideraldinho /app
+USER ideraldinho
 
 EXPOSE 8000
 
