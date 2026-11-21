@@ -19,9 +19,9 @@ hardware, ou de uma decisão minha.
    por dia, e nessa escala todos os candidatos custam menos de US$ 10 por mês.
    Decidem a latência, a chamada de ferramentas e a política de dados. A
    escolha só fecha na bancada (A3), não em tabela de preço.
-2. **O histórico de hoje só vale para o Ollama.** As chamadas de ferramenta não
-   têm id, e o corte do histórico pode separar uma chamada do seu resultado. O
-   Ollama aceita; uma API de nuvem devolve erro 400.
+2. **O histórico só valia para o Ollama.** As chamadas de ferramenta não tinham
+   id, e o corte do histórico podia separar uma chamada do seu resultado. O
+   Ollama aceita; uma API de nuvem devolve erro 400. Corrigido no A1.
 3. **O aparelho não sabe fazer uma pergunta e ouvir a resposta.** Com o wake
    word ligado, depois de "Confirma?" ele volta a esperar o nome; e um "cancela"
    cai no regex do nível 0 e cancela um timer. Qualquer confirmação falada
@@ -108,6 +108,11 @@ segunda versão, e só depois de medida: ela dissuade, não autentica.
 ---
 
 ## A fila
+
+**Feito em 21/11/2026:** A1, A4, A5, e do A2 o cliente no formato da OpenAI com a
+queda para o reserva. O A2 só fecha de verdade no primeiro teste com chave; o
+cliente nativo de um provedor que não fale esse formato fica para quando a
+bancada (A3) apontar que ele é o escolhido.
 
 Tamanho: P, M ou G. Os itens de um mesmo grupo que não dependem um do outro
 podem andar em paralelo.

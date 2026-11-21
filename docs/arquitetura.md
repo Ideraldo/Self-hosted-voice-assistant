@@ -135,7 +135,7 @@ O que notar:
 | Laço do turno | `device/main.py` | amarra tudo acima; `executar_ferramenta` |
 | `/ws` + Session | `gateway/main.py`, `gateway/api/session.py` | autenticação, turno, laço de ferramentas |
 | Conversation | `gateway/conversation/history.py` | prompt de sistema e histórico aparado por turno inteiro |
-| LLMProvider | `gateway/llm/base.py`, `gateway/llm/ollama.py` | interface + Ollama em streaming |
+| LLMProvider | `gateway/llm/base.py`, `ollama.py`, `openai_compat.py`, `fallback.py` | interface, Ollama em streaming, APIs no formato da OpenAI, e a queda para o reserva |
 | device_tools | `gateway/tools/device_tools.py` | declara as 4 ferramentas de agenda e quais são terminais |
 | spotify | `gateway/tools/spotify.py`, `spotify_auth.py` | 11 ferramentas de música, token e escopo |
 | search | `gateway/tools/search.py` | `buscar_na_internet`, DuckDuckGo, Brave, leitor de página |
@@ -486,7 +486,8 @@ O que notar:
   casa com nenhum aparelho, então a escolha cai para o que estiver ativo na
   conta. Quando o raspotify existir na Pi com esse nome, a mesma configuração
   passa a tocar nela (D23).
-- **Não existe ainda:** a Pi, a VPS, o LLM fora do Ollama local, o botão GPIO,
+- **Não existe ainda:** a Pi, a VPS, um LLM de nuvem escolhido e medido (o
+  cliente existe, testado só contra servidor falso), o botão GPIO,
   o modo tradutor, ducking, volume e a similaridade por embeddings no roteador.
   A lista do que espera hardware está no fim do
   [diário de bordo](diario-de-bordo.md).

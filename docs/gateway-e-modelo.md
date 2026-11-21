@@ -116,7 +116,39 @@ porque o qwen3 raciocina por padrão, o que custa latência e pode vazar: o
 qwen3:4b devolveu o rascunho como conteúdo, e num assistente de voz isso
 significa o aparelho **falar** "Okay, the user is asking..." em voz alta.
 
-Trocar o LLM depois mexe em uma função, `build_llm` em `gateway/main.py`.
+### Trocar de modelo é trocar o `.env`
+
+O gateway fala com dois tipos de provedor, escolhidos por `LLM_PROVIDER`:
+
+| Valor | O que alcança |
+|---|---|
+| `ollama` (padrão) | o Ollama local, como sempre |
+| `openai-compat` | qualquer API no formato Chat Completions: OpenAI, Gemini, Groq, DeepSeek, Mistral, OpenRouter, e o próprio Ollama em `/v1` |
+
+Para o segundo bastam `LLM_BASE_URL`, `LLM_API_KEY` e `LLM_MODEL`. O cliente é
+`httpx` puro, sem SDK ([D15](decisions.md)). `LLM_REASONING_EFFORT`,
+`LLM_TEMPERATURE` e `LLM_EXTRA_BODY` só vão no pedido quando preenchidos, porque
+cada provedor recusa um campo diferente. `LLM_THINK` continua valendo só para o
+Ollama.
+
+**Raciocínio nunca vira fala.** O cliente lê só o conteúdo da resposta, ignora
+os campos de raciocínio e corta `<think>…</think>` do texto, mesmo quando a
+marca chega partida entre dois pedaços.
+
+**Reserva.** `LLM_FALLBACK_*` aceita os mesmos sufixos e descreve um segundo
+provedor — por exemplo, o Ollama de casa alcançado por um túnel. A troca só
+acontece **antes** da primeira palavra: se o principal não começa a responder em
+`LLM_FIRST_DELTA_TIMEOUT` segundos (padrão 8), ou devolve erro, o turno vai para
+o reserva. Depois que algo já foi falado, a falha encerra o turno com o aviso de
+modelo fora do ar. Quem falhou descansa 60 s, para o turno seguinte não pagar a
+espera de novo. O `/health` mostra os dois, sem a chave.
+
+**Nada disso rodou contra um provedor de verdade.** Os 38 testes usam um
+servidor falso, e os detalhes de cada API — o que o Gemini exige de volta numa
+chamada de ferramenta, quais valores de `reasoning_effort` cada um aceita —
+vieram de documentação, não de resposta real. O primeiro teste com chave é que
+decide. A escolha do modelo de nuvem continua em aberto: ver
+[próximos passos](proximos-passos.md).
 
 Um 8B ainda alucina — já atribuiu Dom Casmurro ao autor errado. É para isso que
 serve a busca.
