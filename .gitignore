@@ -27,3 +27,6 @@ gateway/data/
 # wake word: os wavs gerados e os embeddings sao derivados -- dois comandos
 # refazem tudo (lab/wakeword/README.md), e sao ~200 MB
 lab/wakeword/dados/
+
+# copias de trabalho temporarias dos agentes; nunca fazem parte do projeto
+.claude/worktrees/
