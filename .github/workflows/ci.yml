@@ -1,0 +1,58 @@
+# Dois trabalhos, e os dois existem por causa de coisas que ja deram errado:
+#
+#   testes    -- a suite inteira, sem microfone, sem modelo e sem rede.
+#   container -- constroi a imagem do gateway e sobe o compose de verdade.
+#                O Dockerfile passou meses escrito sem nunca rodar; quando
+#                rodou, achou o refresh token do Spotify indo junto na imagem.
+#                Aqui ele roda a cada push.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-gateway.txt
+      # So o que os testes importam. O requirements.txt inteiro traria torch e
+      # a bancada -- varios GB para testes que nao tocam em modelo nenhum.
+      - run: pip install -r requirements-gateway.txt pytest pytest-asyncio numpy
+      - run: python -m pytest -q
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env de exemplo
+        run: cp .env.example .env
+      - name: Sobe o gateway
+        run: docker compose -f gateway/docker-compose.yml up --build -d
+      - name: Espera o /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then exit 0; fi
+            sleep 2
+          done
+          docker compose -f gateway/docker-compose.yml logs
+          exit 1
+      - name: Nenhum segredo dentro da imagem
+        run: |
+          docker run --rm --entrypoint sh gateway-gateway -c \
+            'test ! -e /app/.env && test -z "$(ls -A /app/gateway/data)" && test "$(id -u)" != 0'
+      - name: Logs, se algo falhou
+        if: failure()
+        run: docker compose -f gateway/docker-compose.yml logs

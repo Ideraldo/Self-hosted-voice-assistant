@@ -62,7 +62,14 @@ def test_sintese_deterministica_e_reprodutivel():
     """Sem isso, comparar duas epocas mede ruido em vez de qualidade."""
     import hashlib
 
-    from lab.tts.piper import PiperTTS
+    # A voz e um binario fora do git (D12): onde ela nao existe -- o CI, uma
+    # maquina recem-clonada -- o teste nao tem o que medir, e pular e mais
+    # honesto do que falhar por um motivo que nao e o dele.
+    pytest.importorskip("piper")
+    from lab.tts.piper import MODEL_DIR, PiperTTS
+
+    if not (MODEL_DIR / "pt_BR-ideraldo-medium.onnx").exists():
+        pytest.skip("voz pt_BR-ideraldo-medium nao esta em lab/models/piper")
 
     engine = PiperTTS("pt_BR-ideraldo-medium", deterministic=True)
     digests = {
