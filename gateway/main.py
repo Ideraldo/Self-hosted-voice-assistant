@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -11,9 +12,11 @@ load_dotenv()  # before the config dataclasses read the environment
 from fastapi import FastAPI, WebSocket  # noqa: E402
 
 from gateway.api.session import Session  # noqa: E402
-from gateway.config import config  # noqa: E402
+from gateway.config import LLMConfig, config  # noqa: E402
 from gateway.llm.base import LLMProvider  # noqa: E402
+from gateway.llm.fallback import FallbackProvider  # noqa: E402
 from gateway.llm.ollama import OllamaProvider  # noqa: E402
+from gateway.llm.openai_compat import OpenAICompatProvider  # noqa: E402
 from gateway.tools import (  # noqa: E402
     Brave,
     DuckDuckGo,
@@ -27,16 +30,51 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s
 app = FastAPI(title="Ideraldinho gateway")
 
 
-def build_llm() -> LLMProvider:
-    """The only place that knows which provider is active (plan section 6)."""
-    if config.llm_provider == "ollama":
+def descrever_llm(c: LLMConfig) -> str:
+    """Quem responde, para o log e o `/health`: provedor, modelo e host.
+
+    O host entra porque `openai-compat` sozinho não diz com quem se fala. Sai
+    só o nome da máquina, nunca a URL inteira nem a chave: há quem ponha
+    credencial no endereço.
+    """
+    if c.provider == "ollama":
+        return f"ollama:{c.model}"
+    return f"{c.provider}:{c.model}@{urlsplit(c.base_url or '').hostname}"
+
+
+def _um_llm(c: LLMConfig) -> LLMProvider:
+    if c.provider == "ollama":
         return OllamaProvider(
-            base_url=config.ollama_url,
-            model=config.llm_model,
+            base_url=c.base_url or config.ollama_url,
+            model=c.model,
             timeout=config.llm_timeout,
             think=config.llm_think,
         )
-    raise ValueError(f"unknown LLM_PROVIDER {config.llm_provider!r}")
+    if c.provider == "openai-compat":
+        if not c.base_url:
+            raise ValueError("LLM_PROVIDER=openai-compat precisa de LLM_BASE_URL")
+        return OpenAICompatProvider(
+            base_url=c.base_url,
+            model=c.model,
+            api_key=c.api_key,
+            timeout=config.llm_timeout,
+            reasoning_effort=c.reasoning_effort,
+            temperature=c.temperature,
+            extra_body=c.extra_body,
+        )
+    raise ValueError(f"unknown LLM_PROVIDER {c.provider!r}")
+
+
+def build_llm(
+    principal: LLMConfig = config.llm, reserva: LLMConfig | None = config.llm_fallback
+) -> LLMProvider:
+    """The only place that knows which provider is active (plan section 6)."""
+    if reserva is None:
+        return _um_llm(principal)
+    return FallbackProvider(
+        [(descrever_llm(c), _um_llm(c)) for c in (principal, reserva)],
+        primeiro_delta=config.llm_first_delta_timeout,
+    )
 
 
 def build_spotify() -> SpotifyClient | None:
@@ -109,6 +147,14 @@ def build_leitor() -> Leitor | None:
     return Leitor()
 
 
+# Um provedor para o processo inteiro, e não um por conexão: configuração errada
+# aparece na subida em vez de no primeiro "oi", a conexão HTTP com a API é
+# reaproveitada, e o reserva lembra entre uma sessão e outra que o principal
+# caiu há pouco.
+llm = build_llm()
+logging.info(
+    "llm: %s", " -> ".join(descrever_llm(c) for c in (config.llm, config.llm_fallback) if c)
+)
 spotify = build_spotify()
 search = build_search()
 leitor = build_leitor() if search is not None else None
@@ -118,7 +164,8 @@ leitor = build_leitor() if search is not None else None
 async def health() -> dict[str, str]:
     return {
         "status": "ok",
-        "llm": f"{config.llm_provider}:{config.llm_model}",
+        "llm": descrever_llm(config.llm),
+        "llm_reserva": descrever_llm(config.llm_fallback) if config.llm_fallback else "off",
         "spotify": "on" if spotify is not None else "off",
         "busca": getattr(search, "nome", "off"),
         "leitura": "on" if leitor is not None else "off",
@@ -129,7 +176,7 @@ async def health() -> dict[str, str]:
 async def websocket_endpoint(websocket: WebSocket) -> None:
     session = Session(
         websocket=websocket,
-        llm=build_llm(),
+        llm=llm,
         expected_token=config.device_token,
         spotify=spotify,
         search=search,

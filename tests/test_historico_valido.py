@@ -21,6 +21,7 @@ from gateway.api.session import MAX_TOOL_ROUNDS, Session
 from gateway.conversation.history import Conversation
 from gateway.llm.base import Delta, Message
 from gateway.llm.ollama import _wire
+from gateway.llm.openai_compat import _wire as _wire_openai
 
 
 def conferir(historico: list[Message]) -> None:
@@ -49,6 +50,28 @@ def conferir(historico: list[Message]) -> None:
             assert i + 1 < len(mensagens), f"chamada sem resultado: {papeis}"
             assert mensagens[i + 1].tool_call_id == chamada["id"]
     assert len(ids) == len(set(ids)), f"ids repetidos: {ids}"
+    conferir_no_fio(historico)
+
+
+def conferir_no_fio(historico: list[Message]) -> None:
+    """O mesmo histórico, já serializado para o formato da OpenAI.
+
+    As regras de cima valem para a lista de `Message`; o que a API recebe é o
+    que `_wire` faz dela. Um id que se perde na serialização dá o mesmo 400.
+    """
+    fio = [_wire_openai(m) for m in historico]
+    json.dumps(fio)  # tem que caber num corpo de pedido
+    for anterior, mensagem in zip(fio, fio[1:]):
+        if mensagem["role"] == "tool":
+            assert mensagem["tool_call_id"] in [c["id"] for c in anterior.get("tool_calls", [])]
+            assert isinstance(mensagem["content"], str)
+    for mensagem in fio:
+        chamadas = mensagem.get("tool_calls")
+        # Sem chamada, o conteúdo é texto e não é vazio; `null` só com chamada.
+        assert chamadas or (isinstance(mensagem["content"], str) and mensagem["content"])
+        for chamada in chamadas or []:
+            assert chamada["type"] == "function" and isinstance(chamada["id"], str)
+            assert isinstance(json.loads(chamada["function"]["arguments"]), dict)
 
 
 class LLMRoteirizado:

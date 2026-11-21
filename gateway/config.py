@@ -2,8 +2,50 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class LLMConfig:
+    """Um provedor de LLM: o principal (`LLM_*`) ou o reserva (`LLM_FALLBACK_*`)."""
+
+    provider: str  # "ollama" | "openai-compat"
+    model: str
+    # Para `ollama`, vazio cai em OLLAMA_URL. Para `openai-compat` e obrigatorio
+    # e vai ate o `/v1` (ou equivalente): o cliente so acrescenta
+    # `/chat/completions`.
+    base_url: str | None
+    api_key: str | None
+    # Os tres abaixo so entram no pedido quando preenchidos, e so valem para
+    # `openai-compat`. Cada provedor desliga o raciocinio com um campo e um
+    # valor diferentes, e varios devolvem 400 para campo que nao conhecem --
+    # por isso nao ha padrao: quem escolhe o provedor escolhe o valor (D20).
+    reasoning_effort: str | None
+    temperature: float | None
+    # Um objeto JSON somado ao corpo do pedido, para o que nao tem variavel
+    # propria: `{"parallel_tool_calls": false}`, `{"reasoning_format": "hidden"}`.
+    extra_body: dict[str, Any]
+
+
+def _llm(prefixo: str) -> LLMConfig:
+    """Le um provedor do ambiente. O mesmo codigo serve ao principal e ao reserva."""
+
+    def ler(nome: str) -> str | None:
+        return os.getenv(prefixo + nome) or None
+
+    temperatura = ler("TEMPERATURE")
+    return LLMConfig(
+        provider=(ler("PROVIDER") or "ollama").lower(),
+        model=ler("MODEL") or "qwen3:8b",
+        base_url=ler("BASE_URL"),
+        api_key=ler("API_KEY"),
+        reasoning_effort=ler("REASONING_EFFORT"),
+        temperature=float(temperatura) if temperatura else None,
+        extra_body=json.loads(ler("EXTRA_BODY") or "{}"),
+    )
 
 
 @dataclass(frozen=True)
@@ -11,8 +53,18 @@ class GatewayConfig:
     host: str = os.getenv("GATEWAY_HOST", "0.0.0.0")
     port: int = int(os.getenv("GATEWAY_PORT", "8000"))
     device_token: str = os.getenv("DEVICE_TOKEN", "dev-token")
-    llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")
-    llm_model: str = os.getenv("LLM_MODEL", "qwen3:8b")
+    # O modelo principal e, se houver, o reserva -- quem responde quando o
+    # principal nao responde. O caso de uso e o da VPS: principal numa API de
+    # nuvem, reserva no Ollama de casa por tunel. Sem LLM_FALLBACK_PROVIDER nao
+    # ha reserva, e o padrao continua sendo um Ollama local sozinho.
+    llm: LLMConfig = _llm("LLM_")
+    llm_fallback: LLMConfig | None = (
+        _llm("LLM_FALLBACK_") if os.getenv("LLM_FALLBACK_PROVIDER") else None
+    )
+    # Quanto esperar o principal comecar a responder antes de passar ao
+    # reserva. Nao e o LLM_TIMEOUT: aquele pergunta se o modelo morreu, este se
+    # a pessoa ainda esta esperando. So tem efeito com reserva configurado.
+    llm_first_delta_timeout: float = float(os.getenv("LLM_FIRST_DELTA_TIMEOUT", "8"))
     # Raciocinar antes de responder custa latencia e pode vazar para a fala.
     # Medido em D20: com isso ligado o turno passa de 2,8s para 10,3s.
     llm_think: bool = os.getenv("LLM_THINK", "false").lower() in ("1", "true", "sim")
@@ -21,7 +73,6 @@ class GatewayConfig:
     # limite existe para nao pendurar a sessao para sempre, mas ele precisa ser
     # ajustavel: o valor certo depende de onde o modelo esta rodando.
     llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "120"))
-    llm_api_key: str | None = os.getenv("LLM_API_KEY")
     # Spotify: segredos moram aqui e nunca descem para o dispositivo (plano,
     # secao 3). Sem eles, as ferramentas de musica simplesmente nao existem --
     # o modelo nao ve o que nao pode usar.
