@@ -157,3 +157,221 @@ class TestQuebraDeFrase:
         from gateway.api.session import _fim_de_frase
 
         assert _fim_de_frase(texto) is quebra
+
+
+class LLMQueCai:
+    """Um provedor que cai, como o Ollama desligado ou uma API de nuvem fora.
+
+    ``falhas`` diz em quais chamadas cair (0 é a primeira). ``antes`` é o texto
+    que ainda sai antes da queda -- vazio para a conexão recusada, com conteúdo
+    para o stream que morre no meio da resposta. Guarda o histórico que recebeu
+    em cada chamada, porque é nele que um turno perdido deixaria sujeira.
+    """
+
+    def __init__(self, falhas: set[int], antes: list[str] | None = None) -> None:
+        self._falhas = falhas
+        self._antes = antes or []
+        self.historicos: list[list] = []
+
+    async def respond(self, history, tools):
+        chamada = len(self.historicos)
+        self.historicos.append(list(history))
+        if chamada in self._falhas:
+            for pedaco in self._antes:
+                yield Delta(text=pedaco)
+            import httpx
+
+            raise httpx.ConnectError("All connection attempts failed")
+        yield Delta(text="Tudo certo.")
+
+
+class FakeDeviceSocket(FakeReceiveSocket):
+    """O dispositivo inteiro, do aperto de mão à desconexão."""
+
+    def __init__(self, frases: list[str]) -> None:
+        super().__init__(
+            [{"text": json.dumps({"type": "session_start", "device_id": "d", "token": "t"})}]
+            + [{"text": json.dumps({"type": "utterance", "text": f})} for f in frases]
+            + [{"type": "websocket.disconnect", "code": 1000}]
+        )
+        self.fechado = False
+
+    async def accept(self) -> None:
+        pass
+
+    async def receive_text(self) -> str:
+        return (await self.receive())["text"]
+
+    async def close(self, code: int = 1000) -> None:
+        self.fechado = True
+
+
+class TestLLMForaDoAr:
+    """O modelo cair não é o gateway cair, e o aparelho precisa saber a diferença.
+
+    Antes destes testes a exceção do provedor subia até o FastAPI, que fechava
+    o socket; o dispositivo via a conexão morrer e dizia "não consigo falar com
+    o servidor" -- com o servidor de pé. Com o LLM indo para uma API de nuvem,
+    provedor fora do ar deixa de ser acidente e vira rotina.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_sessao_sobrevive_e_o_turno_seguinte_funciona(self):
+        llm = LLMQueCai(falhas={0})
+        socket = FakeDeviceSocket(["primeira", "segunda"])
+        session = Session(websocket=socket, llm=llm, expected_token="t")
+
+        await session.run()  # antes da correção: httpx.ConnectError sai daqui
+
+        assert not socket.fechado
+        falas = [
+            m["text"]
+            for m in socket.textos
+            if m["type"] == "transcript" and m["role"] == "assistant" and not m["final"]
+        ]
+        assert falas[-1] == "Tudo certo."
+
+    @pytest.mark.asyncio
+    async def test_falha_antes_de_qualquer_texto_e_dita_em_voz_alta(self):
+        from gateway.api.session import LLM_FORA_DO_AR
+
+        socket = FakeDeviceSocket(["oi"])
+        session = Session(websocket=socket, llm=LLMQueCai(falhas={0}), expected_token="t")
+
+        await session.run()
+
+        # Depois do `idle` do aperto de mão, o turno inteiro. A frase vai como
+        # transcript parcial do assistente porque é a única coisa que o
+        # dispositivo fala; um `error` ele só imprime.
+        turno = [(m["type"], m.get("value") or m.get("text")) for m in socket.textos[1:]]
+        assert turno == [
+            ("state", "thinking"),
+            ("transcript", "oi"),
+            ("state", "speaking"),
+            ("transcript", LLM_FORA_DO_AR),
+            ("state", "idle"),
+        ]
+        assert socket.textos[-2]["role"] == "assistant"
+        assert socket.textos[-2]["final"] is False
+        assert "error" not in [m["type"] for m in socket.textos]
+
+    @pytest.mark.asyncio
+    async def test_falha_no_meio_da_resposta_avisa_e_termina_o_turno(self):
+        from gateway.api.session import LLM_FORA_DO_AR
+
+        llm = LLMQueCai(falhas={0}, antes=["A Lua fica longe.", " Sao cerca de"])
+        socket = FakeDeviceSocket(["qual a distancia da lua?"])
+        session = Session(websocket=socket, llm=llm, expected_token="t")
+
+        await session.run()
+
+        falas = [
+            m["text"]
+            for m in socket.textos
+            if m["type"] == "transcript" and m["role"] == "assistant"
+        ]
+        # A frase que já tinha saído foi falada e não se desfala; o pedaço pela
+        # metade é descartado, porque meia frase seguida de um aviso soa pior
+        # que o aviso sozinho.
+        assert falas == ["A Lua fica longe.", LLM_FORA_DO_AR]
+        estados = [m["value"] for m in socket.textos if m["type"] == "state"]
+        assert estados == ["idle", "thinking", "speaking", "idle"], "speaking so uma vez"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("antes", [[], ["A Lua fica longe.", " Sao cerca de"]])
+    async def test_o_turno_perdido_nao_fica_no_historico(self, antes):
+        """Uma pergunta sem resposta no histórico envenena o turno seguinte.
+
+        O modelo veria duas mensagens `user` seguidas e responderia às duas --
+        ou, pior, a meia resposta de antes viraria contexto.
+        """
+        llm = LLMQueCai(falhas={0}, antes=antes)
+        socket = FakeDeviceSocket(["primeira", "segunda"])
+        session = Session(websocket=socket, llm=llm, expected_token="t")
+
+        await session.run()
+
+        segundo = [(m.role, m.content) for m in llm.historicos[1] if m.role != "system"]
+        assert segundo == [("user", "segunda")]
+
+    @pytest.mark.asyncio
+    async def test_falha_depois_da_busca_nao_deixa_chamada_orfa(self):
+        """A segunda rodada cai depois de a busca ter ido para o histórico.
+
+        O par `tool_call` + `tool` (D22) sem a resposta que o fecha é um
+        histórico que nenhum modelo foi treinado a ver.
+        """
+
+        class BuscaEDepoisCai(LLMQueCai):
+            async def respond(self, history, tools):
+                if not self.historicos:
+                    self.historicos.append(list(history))
+                    yield Delta(tool_name="buscar_na_internet", tool_args={"consulta": "lua"})
+                    return
+                async for delta in super().respond(history, tools):
+                    yield delta
+
+        class Busca:
+            nome = "fake"
+
+            async def buscar(self, consulta, quantos):
+                return []
+
+        llm = BuscaEDepoisCai(falhas={1})
+        socket = FakeDeviceSocket(["primeira", "segunda"])
+        session = Session(websocket=socket, llm=llm, expected_token="t", search=Busca())
+
+        await session.run()
+
+        assert len(llm.historicos) == 3
+        terceiro = [(m.role, m.content) for m in llm.historicos[2] if m.role != "system"]
+        assert terceiro == [("user", "segunda")]
+
+    @pytest.mark.asyncio
+    async def test_a_falha_vai_para_o_log(self, caplog):
+        socket = FakeDeviceSocket(["oi"])
+        session = Session(websocket=socket, llm=LLMQueCai(falhas={0}), expected_token="t")
+
+        with caplog.at_level("ERROR", logger="ideraldinho.session"):
+            await session.run()
+
+        assert "ConnectError" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_o_dispositivo_fala_o_aviso_e_volta_a_ouvir(self):
+        """As duas pontas juntas: o que o gateway manda é o que o aparelho fala."""
+        import asyncio
+
+        from common.messages import State
+        from common.serialization import decode
+        from device.main import handle_incoming
+        from device.state import StateMachine
+        from gateway.api.session import LLM_FORA_DO_AR
+
+        socket = FakeDeviceSocket(["oi"])
+        session = Session(websocket=socket, llm=LLMQueCai(falhas={0}), expected_token="t")
+        await session.run()
+
+        class Cliente:
+            async def receive(self):
+                for m in socket.textos[1:]:  # o primeiro idle é do aperto de mão
+                    yield decode(json.dumps(m))
+
+        class Voz:
+            def synthesize(self, text):
+                return text
+
+        class AltoFalante:
+            def __init__(self):
+                self.falado = []
+
+            def play(self, pcm):
+                self.falado.append(pcm)
+
+        machine = StateMachine()
+        machine.transition(State.LISTENING)
+        alto_falante = AltoFalante()
+        await handle_incoming(Cliente(), machine, Voz(), alto_falante, asyncio.Lock(), None)
+
+        assert alto_falante.falado == [LLM_FORA_DO_AR]
+        assert machine.state is State.IDLE

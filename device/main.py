@@ -155,6 +155,12 @@ async def handle_incoming(
 
         elif isinstance(message, Error):
             print(f"  [erro do gateway: {message.message}]")
+            # O erro encerra o turno, e turno encerrado é IDLE. Sair daqui com a
+            # máquina em LISTENING ou THINKING não quebra nada agora: quebra na
+            # frase seguinte, com `ValueError` na transição para LISTENING. Todo
+            # estado tem saída legal para IDLE, então não há caminho a escolher.
+            if machine.state is not State.IDLE:
+                machine.transition(State.IDLE)
             return
 
 

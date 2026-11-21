@@ -341,11 +341,11 @@ stateDiagram-v2
     direction LR
     [*] --> IDLE
     IDLE --> LISTENING: microfone aberto para a fala, ou texto digitado
-    LISTENING --> IDLE: 30 s sem fala, ou transcrição vazia
+    LISTENING --> IDLE: 30 s sem fala, transcrição vazia, ou error do gateway
     LISTENING --> THINKING: nível 0 casou, ou o gateway mandou state thinking
     THINKING --> SPEAKING: primeira frase a falar
-    THINKING --> IDLE: resposta vazia
-    SPEAKING --> IDLE: fim do turno
+    THINKING --> IDLE: resposta vazia, ou error do gateway
+    SPEAKING --> IDLE: fim do turno, ou error do gateway
     SPEAKING --> LISTENING: barge-in, permitido mas ainda sem quem dispare
 ```
 

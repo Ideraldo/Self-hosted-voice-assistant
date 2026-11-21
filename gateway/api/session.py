@@ -57,6 +57,28 @@ MAX_TOOL_ROUNDS = 3
 #: então é rápida; o limite existe para o caso de o dispositivo sumir no meio.
 TOOL_TIMEOUT = 10.0
 
+#: O que o aparelho diz quando o modelo não responde. É outra frase, de
+#: propósito, que a do dispositivo para o gateway fora do ar ("nao consigo falar
+#: com o servidor"): aqui o servidor está de pé e a conversa continua, quem
+#: sumiu foi o provedor do LLM. Sem acento, como toda frase que vai para o Piper.
+LLM_FORA_DO_AR = "Nao consegui falar com o modelo agora. Tenta de novo daqui a pouco."
+
+
+class LLMIndisponivel(Exception):
+    """O provedor do LLM falhou: fora do ar, tempo esgotado, erro HTTP.
+
+    Existe para separar esta falha de todas as outras do turno. Um `except
+    Exception` em volta do turno inteiro também pegaria defeito nosso -- e
+    diria ao usuário que o modelo caiu quando quem quebrou foi o gateway.
+
+    `falando` diz se o `state speaking` deste turno já saiu, para o aviso não
+    anunciar o mesmo estado duas vezes quando a queda é no meio da resposta.
+    """
+
+    def __init__(self, falando: bool) -> None:
+        super().__init__("o provedor do LLM falhou")
+        self.falando = falando
+
 
 def _fim_de_frase(texto: str) -> bool:
     """O texto acumulado termina numa frase que já dá para falar?
@@ -146,8 +168,25 @@ class Session:
         # do gateway vê a frase que gerou a resposta.
         await self._send(Transcript(text=text, role="user"))
 
+        antes = self._conversation.checkpoint()
         self._conversation.add_user(text)
-        answer = await self._speak_response(turn)
+        try:
+            answer = await self._speak_response(turn)
+        except LLMIndisponivel as exc:
+            # Sem isto a exceção subia até o FastAPI, que fechava o socket, e o
+            # dispositivo dizia "nao consigo falar com o servidor" com o
+            # servidor de pé. Provedor fora do ar é rotina, ainda mais com o
+            # LLM numa API de nuvem: o turno termina, a sessão não.
+            log.error("LLM indisponivel; turno abandonado: %r", exc.__cause__)
+            self._conversation.rollback(antes)
+            # O aviso vai como frase do assistente, e não como `error`: o
+            # dispositivo fala transcript e só imprime erro, e aqui o que
+            # importa é a pessoa ouvir. O que já tinha sido falado fica falado;
+            # a meia frase que estava pendente é descartada.
+            if not exc.falando:
+                await self._send(StateMessage(value=State.SPEAKING))
+            await self._send(Transcript(text=LLM_FORA_DO_AR, role="assistant", final=False))
+            answer = ""
         if answer:
             self._conversation.add_assistant(answer)
 
@@ -210,6 +249,19 @@ class Session:
             # final=False: mais frases vêm em seguida nesta mesma resposta.
             await self._send(Transcript(text=sentence.strip(), role="assistant", final=False))
 
+        async def stream():
+            # Só a falha do provedor vira `LLMIndisponivel`. O que quebra no
+            # corpo do laço abaixo -- o socket do dispositivo caindo no meio de
+            # um `flush`, por exemplo -- não passa por aqui e continua sendo o
+            # que era.
+            try:
+                async for delta in self._llm.respond(
+                    self._conversation.prompt(), tools=self._tools
+                ):
+                    yield delta
+            except Exception as exc:  # noqa: BLE001 -- cada provedor falha do seu jeito
+                raise LLMIndisponivel(falando=spoken) from exc
+
         # Uma rodada por chamada de ferramenta: o modelo pede, o dispositivo
         # executa, o resultado volta para o histórico e o modelo continua. Sem
         # este laço a chamada saía pelo fio e ninguém esperava a resposta -- que
@@ -217,9 +269,7 @@ class Session:
         for rodada in range(MAX_TOOL_ROUNDS + 1):
             chamada: tuple[str, dict] | None = None
 
-            async for delta in self._llm.respond(
-                self._conversation.prompt(), tools=self._tools
-            ):
+            async for delta in stream():
                 if delta.tool_name:
                     # A execução é sempre do dispositivo (plano, seção 5, regra 3).
                     chamada = (delta.tool_name, delta.tool_args or {})

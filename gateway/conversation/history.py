@@ -85,6 +85,25 @@ class Conversation:
         self._turns.append(Message(role="tool", content=f"{name}: {result}"))
         self._trim()
 
+    def checkpoint(self) -> list[Message]:
+        """O histórico como está agora, para poder voltar a ele.
+
+        É uma cópia e não um índice de propósito: `_trim` apaga do começo, então
+        "as últimas N mensagens" deixa de apontar para o mesmo lugar no meio de
+        um turno longo.
+        """
+        return list(self._turns)
+
+    def rollback(self, checkpoint: list[Message]) -> None:
+        """Desfaz o turno que não terminou.
+
+        Um turno pela metade é pior que turno nenhum: a pergunta sem resposta
+        vira duas mensagens `user` seguidas, e o par `tool_call` + `tool` sem a
+        frase que o fecha é um histórico que o modelo nunca viu (D22). Nos dois
+        casos quem paga é o turno seguinte, que não tem nada a ver com a falha.
+        """
+        self._turns = list(checkpoint)
+
     def prompt(self) -> list[Message]:
         return [Message(role="system", content=SYSTEM_PROMPT), *self._turns]
 
