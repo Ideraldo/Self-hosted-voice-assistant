@@ -20,6 +20,58 @@ planejado.
 
 ---
 
+## Em uma tela
+
+Só os componentes e como se ligam: por onde a voz entra, o que fica em casa, o
+que vai para o gateway e quais serviços de fora ele alcança. Os diagramas
+seguintes abrem cada caixa.
+
+```mermaid
+flowchart LR
+    VOICE(["Voz"])
+
+    subgraph DEVICE["Dispositivo — em casa, funciona offline"]
+        direction TB
+        LISTEN["Ouvir<br/>wake word · VAD · fala para texto"]
+        LOCAL["Nível 0, local<br/>timers · alarmes · hora"]
+        SPEAK["Falar<br/>texto para fala, voz própria"]
+        FACE["Rosto<br/>página web"]
+        LISTEN -->|"comando conhecido"| LOCAL --> SPEAK
+    end
+
+    subgraph GATEWAY["Gateway — contêiner, hoje no PC, depois na VPS"]
+        direction TB
+        SESSION["Sessão<br/>conversa + laço de ferramentas"]
+        TOOLS["Ferramentas<br/>música · busca · agenda"]
+        SESSION --> TOOLS
+    end
+
+    LLM["LLM<br/>Ollama hoje, API de nuvem depois"]
+    SPOTIFY["Spotify"]
+    SEARCH["Busca na internet<br/>DuckDuckGo / Brave"]
+    OUT(["Alto-falante + tela"])
+
+    VOICE --> LISTEN
+    LISTEN ==>|"todo o resto, em texto"| SESSION
+    SESSION ==>|"resposta, em texto"| SPEAK
+    SESSION --> LLM
+    TOOLS --> SPOTIFY
+    TOOLS --> SEARCH
+    SPEAK --> OUT
+    FACE --> OUT
+
+    classDef ext fill:#fde8d0,stroke:#c2571a,color:#1a1a1a
+    classDef io fill:#eeeeee,stroke:#555555,color:#1a1a1a
+    class LLM,SPOTIFY,SEARCH ext
+    class VOICE,OUT io
+```
+
+**O que notar.** Um comando conhecido — timer, alarme, hora — nunca sai do
+dispositivo. Todo o resto sobe como texto e volta como texto: o áudio não cruza
+a rede em nenhum dos dois sentidos. E só o gateway fala com serviços de fora.
+
+---
+
 ## 1. Visão geral
 
 ```mermaid

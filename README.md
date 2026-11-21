@@ -10,6 +10,124 @@ commit**, and **alarms and timers always execute on the device**.
 Everything here runs on a PC today. There is no Pi yet, and no number in this
 repository was measured on one.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    VOICE(["Voice"])
+
+    subgraph DEVICE["Device — at home, works offline"]
+        direction TB
+        LISTEN["Listen<br/>wake word · VAD · speech-to-text"]
+        LOCAL["Local skills<br/>timers · alarms · clock"]
+        SPEAK["Speak<br/>text-to-speech, own voice"]
+        FACE["Face<br/>web page"]
+        LISTEN -->|"known command"| LOCAL --> SPEAK
+    end
+
+    subgraph GATEWAY["Gateway — container, PC today, VPS next"]
+        direction TB
+        SESSION["Session<br/>conversation + tool loop"]
+        TOOLS["Tools<br/>music · web search · schedules"]
+        SESSION --> TOOLS
+    end
+
+    LLM["LLM<br/>Ollama today, cloud API next"]
+    SPOTIFY["Spotify"]
+    SEARCH["Web search<br/>DuckDuckGo / Brave"]
+    OUT(["Speaker + screen"])
+
+    VOICE --> LISTEN
+    LISTEN ==>|"everything else, as text"| SESSION
+    SESSION ==>|"answer, as text"| SPEAK
+    SESSION --> LLM
+    TOOLS --> SPOTIFY
+    TOOLS --> SEARCH
+    SPEAK --> OUT
+    FACE --> OUT
+
+    classDef ext fill:#fde8d0,stroke:#c2571a,color:#1a1a1a
+    classDef io fill:#eeeeee,stroke:#555555,color:#1a1a1a
+    class LLM,SPOTIFY,SEARCH ext
+    class VOICE,OUT io
+```
+
+A known command — timer, alarm, the time — never leaves the device. Everything
+else goes up as text and comes back as text: audio never crosses the network.
+Only the gateway talks to outside services.
+
+<details>
+<summary>The detailed view: every module in both processes</summary>
+
+```mermaid
+flowchart TB
+    subgraph DEV["Processo 1 — device (python -m device.main)"]
+        MIC["Microfone + VAD<br/>audio/capture.py"]
+        WAKE["Wake word, opcional<br/>activation/wake.py"]
+        STT["STT faster-whisper<br/>stt/"]
+        ROUTER["Roteador nível 0, regex<br/>router/intents.py"]
+        LOCAL["Serviços locais + agendador<br/>local/"]
+        DB[("SQLite<br/>schedules.db")]
+        TTS["TTS Piper<br/>tts/"]
+        SPK["Alto-falante<br/>audio/playback.py"]
+        SM["Máquina de estados<br/>state.py"]
+        FACE["Servidor do rosto<br/>rosto/server.py"]
+        WSC["GatewayClient<br/>ws_client.py"]
+    end
+
+    PAGE["Navegador<br/>página do rosto"]
+
+    subgraph GW["Processo 2 — gateway (uvicorn gateway.main:app)"]
+        API["/ws + Session<br/>api/session.py"]
+        CONV["Conversation<br/>prompt de sistema + histórico"]
+        LLMP["LLMProvider<br/>llm/ollama.py"]
+        DTOOLS["device_tools.py<br/>só declara"]
+        SPOT["spotify.py<br/>executa aqui"]
+        SEARCH["search.py<br/>executa aqui"]
+        TOKEN[("spotify_token.json<br/>gateway/data/")]
+    end
+
+    OLLAMA["Ollama<br/>qwen3:8b"]
+    SPOTAPI["Spotify Web API"]
+    WEB["DuckDuckGo ou Brave"]
+
+    MIC --> WAKE --> STT --> ROUTER
+    ROUTER -->|"casou"| LOCAL
+    ROUTER -->|"não casou"| WSC
+    LOCAL <--> DB
+    LOCAL --> TTS
+    WSC -->|"frases da resposta"| TTS
+    WSC -->|"tool_call"| LOCAL
+    TTS --> SPK
+    SM --> FACE
+    FACE -->|"WebSocket local<br/>state + emotion"| PAGE
+
+    WSC <==>|"um WebSocket, só JSON de texto<br/>nenhum áudio"| API
+
+    API --> CONV
+    API --> LLMP
+    API --> DTOOLS
+    API --> SPOT
+    API --> SEARCH
+    SPOT <--> TOKEN
+    LLMP -->|"HTTP /api/chat"| OLLAMA
+    SPOT -->|"HTTPS"| SPOTAPI
+    SEARCH -->|"HTTPS"| WEB
+
+    classDef local fill:#d8f3dc,stroke:#2d6a4f,color:#111
+    classDef servidor fill:#dbe9ff,stroke:#1d4e89,color:#111
+    classDef internet fill:#ffe5d0,stroke:#b3541e,color:#111
+    class MIC,WAKE,STT,ROUTER,LOCAL,DB,TTS,SPK,SM,FACE,PAGE local
+    class WSC,API,CONV,LLMP,DTOOLS,SPOT,SEARCH,TOKEN,OLLAMA servidor
+    class SPOTAPI,WEB internet
+```
+
+</details>
+
+Seven more diagrams — one turn end to end, the wire protocol, the state
+machine, the tool loop, deployment today and planned — are in
+[`docs/arquitetura.md`](docs/arquitetura.md).
+
 ## Documentation
 
 Start here, then follow the topic:
