@@ -189,6 +189,12 @@ class Session:
             answer = ""
         if answer:
             self._conversation.add_assistant(answer)
+        else:
+            # Turno sem resposta nenhuma -- o modelo devolveu vazio, ou só pediu
+            # ferramenta até estourar as rodadas. Deixar a pergunta no histórico
+            # faria o turno seguinte começar com dois `user` seguidos. Ferramenta
+            # terminal não cai aqui: a frase dela é a resposta.
+            self._conversation.rollback(antes)
 
         await self._send(StateMessage(value=State.IDLE))
         turn.report()
@@ -267,12 +273,12 @@ class Session:
         # este laço a chamada saía pelo fio e ninguém esperava a resposta -- que
         # era o estado do código até aqui.
         for rodada in range(MAX_TOOL_ROUNDS + 1):
-            chamada: tuple[str, dict] | None = None
+            chamada: tuple[str, dict, str | None] | None = None
 
             async for delta in stream():
                 if delta.tool_name:
                     # A execução é sempre do dispositivo (plano, seção 5, regra 3).
-                    chamada = (delta.tool_name, delta.tool_args or {})
+                    chamada = (delta.tool_name, delta.tool_args or {}, delta.tool_call_id)
                     break
                 if not delta.text:
                     continue
@@ -290,12 +296,13 @@ class Session:
             if chamada is None:
                 break
 
-            nome, args = chamada
+            nome, args, call_id = chamada
             if rodada == MAX_TOOL_ROUNDS:
+                # A chamada que não foi executada não entra no histórico. Isto
+                # gravava só o resultado ("falhou: numero maximo..."), sem a
+                # chamada: um `tool` órfão, que o Ollama tolera e uma API de
+                # nuvem recusa.
                 log.warning("modelo insistiu em ferramenta apos %d rodadas", rodada)
-                self._conversation.add_tool_result(
-                    nome, "falhou: numero maximo de tentativas atingido"
-                )
                 break
 
             if nome in SEARCH_TOOL_NAMES:
@@ -311,8 +318,13 @@ class Session:
             # nas ferramentas terminais. Sem ele o modelo para de chamar
             # ferramenta no turno seguinte e passa a narrar ações que não fez
             # (D22).
-            self._conversation.add_tool_call(nome, args)
-            self._conversation.add_tool_result(nome, resultado)
+            # O id do provedor é mantido quando existe e ainda não foi usado
+            # nesta conversa. Senão é gerado aqui, num formato que cabe nas
+            # duas famílias de API: só letras, dígitos e `_`, até 40 caracteres.
+            if not call_id or self._conversation.has_tool_call(call_id):
+                call_id = f"call_{uuid.uuid4().hex[:24]}"
+            self._conversation.add_tool_call(nome, args, call_id)
+            self._conversation.add_tool_result(nome, resultado, call_id)
 
             if nome in TERMINAL_TOOLS or nome in SPOTIFY_TOOL_NAMES:
                 # A frase devolvida já está pronta para ser falada. Ela vai como

@@ -21,10 +21,16 @@ def _wire(message: Message) -> dict[str, Any]:
     A mensagem do assistente que pediu ferramenta carrega `tool_calls` e
     normalmente tem `content` vazio -- é assim que os modelos foram treinados, e
     é o que faz o turno seguinte continuar usando ferramentas.
+
+    O id da chamada fica de fora, nos dois lados do par. O Ollama casa
+    resultado e chamada pela posição, e as versões recentes até aceitam `id` e
+    `tool_call_id` -- mas campo novo aqui pode mudar o prompt que o template
+    monta, e o formato que a D22 mediu (3/3) é este, sem id. Só `function`
+    viaja: é o que toda versão do `/api/chat` aceita.
     """
     corpo: dict[str, Any] = {"role": message.role, "content": message.content}
     if message.tool_calls:
-        corpo["tool_calls"] = message.tool_calls
+        corpo["tool_calls"] = [{"function": c["function"]} for c in message.tool_calls]
     return corpo
 
 
@@ -86,7 +92,13 @@ class OllamaProvider:
                         args = function.get("arguments") or {}
                         if isinstance(args, str):
                             args = json.loads(args)
-                        yield Delta(tool_name=function.get("name"), tool_args=args)
+                        # Versões recentes do Ollama mandam `id`; as antigas
+                        # não, e aí a sessão gera um.
+                        yield Delta(
+                            tool_name=function.get("name"),
+                            tool_args=args,
+                            tool_call_id=call.get("id") or None,
+                        )
 
                     # `thinking` vem em campo separado quando o modelo pensa.
                     # Nunca vira fala: é rascunho, não resposta.
