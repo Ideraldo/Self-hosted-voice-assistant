@@ -141,7 +141,7 @@ O que notar:
 | search | `gateway/tools/search.py` | `buscar_na_internet`, DuckDuckGo, Brave, leitor de página |
 | Tempos do turno | `gateway/timing.py` | marca e loga cada etapa |
 | Contrato | `common/messages.py`, `common/serialization.py` | os tipos de mensagem e o JSON |
-| Contêiner | `gateway/Dockerfile`, `gateway/docker-compose.yml` | escrito, nunca executado (D16) |
+| Contêiner | `gateway/Dockerfile`, `gateway/docker-compose.yml` | rodou em Linux em 21/11/2026 e roda no CI a cada push; falta a VPS e o modelo real (D16) |
 
 ---
 
@@ -462,8 +462,10 @@ O que notar:
 - **Migrar é trocar `GATEWAY_URL`.** O dispositivo conhece um endereço só, e
   nenhum import cruza de `device/` para `gateway/`. O contêiner copia apenas
   `common/` e `gateway/`.
-- **O contêiner está escrito e nunca rodou** (D16). O compose já resolve o
-  Ollama por `host.docker.internal` e guarda o token do Spotify num volume.
+- **O contêiner já rodou, mas não aqui** (D16): em Linux, em 21/11/2026, e no
+  CI a cada push. No PC o gateway continua subindo com `uvicorn`. O compose
+  resolve o Ollama por `host.docker.internal` e guarda o token do Spotify num
+  volume. Falta a VPS, e falta o modelo de verdade do outro lado.
 - **A música hoje não sai do Ideraldinho.** `SPOTIFY_DEVICE=Ideraldinho` não
   casa com nenhum aparelho, então a escolha cai para o que estiver ativo na
   conta. Quando o raspotify existir na Pi com esse nome, a mesma configuração

@@ -121,7 +121,7 @@ Per topic:
 ```
 device/      runs on the PC now, on a Pi later
   audio/         capture (mic + VAD), playback
-  activation/    wake word, GPIO button, power-source detection
+  activation/    wake word (GPIO button and power-source detection are planned)
   router/        level-0 intent matching: regex + slot extraction
   local/         timers, alarms, the clock -- SQLite + scheduler, no network
   stt/           faster-whisper: transcription happens before the wire (D1)
@@ -203,7 +203,7 @@ the connection. A rejected token is the one failure that is not retried.
 | Phase | State | Where to read |
 |---|---|---|
 | 0 — the loop, end to end | wired; 10 clean turns still to verify with a real mic | this file |
-| 1 — gateway in a container | written, **never executed**; first run will be on the VPS | [gateway](docs/gateway-e-modelo.md) |
+| 1 — gateway in a container | runs on Linux and in CI on every push (first run 2026-11-21); not yet on a VPS, nor with the real model | [gateway](docs/gateway-e-modelo.md) |
 | 2 — offline timers and alarms | done, verified by running it | [nível 0](docs/nivel-0-offline.md) |
 | 3 — tools | done, minus Home Assistant (out of scope) | [gateway](docs/gateway-e-modelo.md), [spotify](docs/spotify.md) |
 | 4 — the face | up on the PC; kiosk and the RTF measurement wait on a Pi | [rosto](docs/rosto.md) |
@@ -224,7 +224,7 @@ what ruled out a local LLM on day 1.
 on a PC. Moving from the bench to real device code already pushed RTF from 0.43
 to 0.6–0.9, and a Pi is slower than both.
 
-Everything **waiting on hardware** — measuring STT on the Pi, raspotify, ducking,
-and the one `docker compose up` that has never run — is collected in a single
+Everything **waiting on hardware** — measuring STT on the Pi, raspotify,
+ducking — is collected in a single
 checklist at the end of [`docs/diario-de-bordo.md`](docs/diario-de-bordo.md), so
 none of it has to be rediscovered.
