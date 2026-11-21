@@ -2,7 +2,7 @@
 
 Good enough to build the whole pipeline against. The plan's target is a cloud
 model behind this same interface (section 6) -- when that arrives, only
-``build_provider`` changes.
+``build_llm`` (in ``gateway/main.py``) changes.
 """
 
 from __future__ import annotations

@@ -51,10 +51,14 @@ class DeviceConfig:
     stt_model_dir: str = os.getenv("STT_MODEL_DIR", "lab/models/faster-whisper")
     # Quanto silencio encerra a fala. A secao 11 orca 200-300 ms; na pratica
     # cortar cedo demais decepa o fim da frase.
-    # Palavra de ativacao (Fase 7). Desligada por padrao enquanto o modelo do
-    # "Ideraldinho" nao existe: os modelos que vem prontos com o openWakeWord
-    # sao "alexa", "hey jarvis" e afins, e acordar o aparelho chamando por
-    # outro nome seria pior que nao ter wake word nenhum.
+    # Palavra de ativacao (Fase 7). O modelo do "Ideraldinho" existe (v3, D31),
+    # mas e um binario fora do git (`lab/models/`, D12): o padrao abaixo nao
+    # pode apontar para um arquivo que um clone novo nao tem. Por isso ela vem
+    # desligada, e o padrao de WAKE_MODEL continua sendo um modelo que vem
+    # pronto com o openWakeWord -- "alexa", "hey jarvis" e afins --, que acorda
+    # o aparelho pelo nome errado e so serve para testar o encanamento.
+    # Para usar o de verdade: treine (lab/wakeword/README.md) e aponte
+    # WAKE_MODEL=lab/models/wakeword/ideraldinho.onnx com WAKE_ENABLED=1.
     wake_enabled: bool = os.getenv("WAKE_ENABLED", "0").strip().lower() in {"1", "true", "on"}
     # Nome de um modelo que vem no pacote, ou o caminho de um .onnx proprio.
     wake_model: str = os.getenv("WAKE_MODEL", "hey_jarvis")

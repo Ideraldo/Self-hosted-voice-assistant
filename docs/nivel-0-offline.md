@@ -1,8 +1,8 @@
 # Nível 0: o que funciona com a internet caída
 
-Timer, alarme, lembrete e a hora rodam **no dispositivo**, sem rede e sem LLM. É
-a parte que precisa sobreviver a uma queda de internet, e a razão de a Fase 2 vir
-antes do rosto e do wake word.
+Timer, alarme e a hora rodam **no dispositivo**, sem rede e sem LLM — junto com
+listar e cancelar o que está agendado. É a parte que precisa sobreviver a uma
+queda de internet, e a razão de a Fase 2 vir antes do rosto e do wake word.
 
 Decisões relacionadas: [D1](decisions.md), [D17](decisions.md),
 [D26](decisions.md).
@@ -32,6 +32,12 @@ porque um roteador que chuta é pior que roteador nenhum (plano, seção 5, regr
 
 ## O que falta nesta fase, de propósito
 
+- **Lembrete.** Está no plano e não foi implementado: não há intenção de
+  lembrete no roteador, nem serviço local, nem ferramenta no gateway. O que
+  existe é só o lugar reservado — `lembrete` como tipo em
+  `device/local/store.py` e a frase de anúncio em `device/local/service.py` —,
+  e nada cria um agendamento desse tipo. "Me lembra em dez minutos" casa hoje
+  como timer, sem guardar o assunto.
 - **Similaridade por embedding** para paráfrases, esperando um log real de nível
   2 dizer quais paráfrases as pessoas usam de verdade.
 - **Controle de volume**, que é mixer do sistema operacional e específico de

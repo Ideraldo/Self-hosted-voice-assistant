@@ -1,16 +1,18 @@
 """Ferramentas que o LLM pode chamar (plano, seção 3).
 
-Dois grupos, e a diferença entre eles é onde a execução acontece:
+Três grupos, e a primeira diferença entre eles é onde a execução acontece:
 
 - **`device_tools`** — timer, alarme, agenda. O gateway declara e transporta; a
   execução é do dispositivo, sempre (plano, seção 5, regra 3). É o que faz o
   despertador não depender do servidor.
 - **`spotify`** — o gateway executa, porque aqui há segredo, e segredo não desce
   pelo fio.
+- **`search`** — a busca na internet. O gateway também executa (D24).
 
-O que os dois têm em comum: o resultado já vem redigido para ser falado, e vai
-ao ar sem uma segunda rodada de LLM. Ver D18 -- o modelo reescrevendo isso perde
-item e custa segundos.
+O que os dois primeiros têm em comum: o resultado já vem redigido para ser
+falado, e vai ao ar sem uma segunda rodada de LLM. Ver D18 -- o modelo
+reescrevendo isso perde item e custa segundos. A busca é a exceção: devolve
+material para o modelo ler, e o turno segue para uma segunda rodada.
 """
 
 from gateway.tools.device_tools import DEVICE_TOOLS, TERMINAL_TOOLS, TOOL_TO_INTENT

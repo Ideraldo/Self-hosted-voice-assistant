@@ -30,7 +30,10 @@ CSS, dirija pelo teclado:
 | `FACE_PORT` | `8080` | porta da página e do WebSocket dela (a mesma) |
 | `FACE_ENABLED` | `1` | `0` sobe o dispositivo sem rosto nenhum |
 | `FACE_THEME` | `minimo` | qual rosto o `/` serve: `minimo` ou `anime` |
-| `DISPLAY_MODE` | `window` | `kiosk` na Pi, quando houver Pi |
+
+`DISPLAY_MODE` (`window` ou `kiosk`) aparece no `.env.example` e é lido em
+`device/config.py`, mas nada o usa: o modo kiosk é da Pi, e não há Pi. Mudar o
+valor hoje não muda nada.
 
 ---
 
@@ -61,6 +64,11 @@ assinante que levanta exceção vira linha de log, um servidor que não sobe dev
 **Emoção é um segundo eixo, não um quinto estado.** `Emotion` está declarado no
 protocolo como campo opcional e nada envia ainda: encaixar um eixo novo no
 formato do fio depois é caro, um campo opcional vazio não é.
+
+Faltam as duas pontas, não uma. O gateway não preenche `emotion`, e se
+preenchesse o dispositivo ignoraria: `handle_incoming` em `device/main.py` aplica
+só o estado da mensagem. Quem chama `set_emotion` hoje é apenas
+`scripts/rosto.py`, pelo teclado. No uso real o rosto fica em `neutral`.
 
 ## O critério de aceite mudou
 

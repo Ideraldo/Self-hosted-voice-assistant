@@ -58,17 +58,21 @@ class Schedule:
 
 
 class ScheduleStore:
-    """Acesso ao banco. Thread-safe porque o agendador e o turno de voz batem aqui.
+    """Acesso ao banco, com um lock único em volta de cada operação.
 
-    As operações são curtas o bastante para um lock único ser mais barato — e
-    muito mais fácil de conferir — que uma conexão por thread.
+    Hoje o agendador e o turno de voz batem aqui da mesma thread: o agendador é
+    uma tarefa asyncio no laço do dispositivo, não uma thread. O lock é
+    precaução para o dia em que alguma chamada sair do laço -- as operações são
+    curtas o bastante para ele ser mais barato, e muito mais fácil de conferir,
+    que uma conexão por thread.
     """
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        # check_same_thread=False porque o agendador roda noutra thread; o lock
-        # abaixo é o que realmente serializa.
+        # check_same_thread=False é folga, não necessidade: o agendador é uma
+        # tarefa asyncio no mesmo laço (e na mesma thread) do turno. Se um dia
+        # alguma chamada for para outra thread, o lock abaixo é o que serializa.
         self._db = sqlite3.connect(self._path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.Lock()

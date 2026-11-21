@@ -60,8 +60,9 @@ async def speak(voice, speaker, text: str) -> float:
     """Sintetiza e toca, fora do laço de eventos.
 
     Piper e a placa de som bloqueiam a thread. Rodar isso direto no laço travaria
-    o WebSocket enquanto o aparelho fala — e é justamente enquanto ele fala que
-    precisa continuar ouvindo, porque o barge-in depende disso (plan section 1).
+    o WebSocket e o agendador enquanto o aparelho fala. O barge-in (plan section
+    1) também vai precisar do laço livre, mas ainda não existe: hoje ninguém
+    ouve durante a fala, e o microfone descarta o que entrou nesse intervalo.
     """
     started = time.perf_counter()
     await asyncio.to_thread(speaker.play, voice.synthesize(text))
