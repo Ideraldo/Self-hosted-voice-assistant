@@ -16,7 +16,16 @@ from common.messages import MESSAGES
 def encode(message: Any) -> str:
     if not is_dataclass(message):
         raise TypeError(f"expected a message dataclass, got {type(message)!r}")
-    return json.dumps(asdict(message), ensure_ascii=False)
+    # Campo opcional vazio não vai para o fio. O `decode` do outro lado recusa
+    # campo que não conhece, então mandar `"expects_reply": null` em toda
+    # mensagem quebraria um par de versão anterior mesmo quando ninguém usa o
+    # campo. Omitindo, quem nunca preenche o opcional fala exatamente o
+    # protocolo antigo -- e quem recebe reconstrói o `None` pelo default.
+    opcionais = {f.name for f in fields(message) if f.default is None}
+    payload = {
+        k: v for k, v in asdict(message).items() if not (v is None and k in opcionais)
+    }
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def decode(raw: str | bytes) -> Any:

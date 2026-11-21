@@ -15,6 +15,11 @@ Desde a Fase 2 o turno tem dois caminhos. O roteador de intenções olha a frase
 primeiro: se ela é nível 0 -- timer, alarme, hora, cancelar -- o próprio
 dispositivo resolve, sem rede e sem LLM. Só o que ele não reconhece sobe para o
 gateway. É por isso que o aparelho liga e funciona com o gateway desligado.
+
+A exceção a essa ordem é a janela de continuação: quando o turno termina numa
+pergunta do assistente, a fala seguinte é a resposta dela. O microfone reabre
+por alguns segundos sem exigir o nome, e a frase vai para quem perguntou -- o
+gateway ou o serviço local -- antes de qualquer regex olhar para ela.
 """
 
 from __future__ import annotations
@@ -41,6 +46,7 @@ from device.audio.capture import Microphone  # noqa: E402
 from device.audio.playback import Speaker  # noqa: E402
 from device.config import config, voice_path  # noqa: E402
 from device.local import LocalServices, Scheduler, ScheduleStore  # noqa: E402
+from device.local.service import pede_resposta, responder_qual_cancelar  # noqa: E402
 from device.rosto import start_face  # noqa: E402
 from device.router import match as match_intent  # noqa: E402
 from device.router.intents import Intent  # noqa: E402
@@ -49,6 +55,12 @@ from device.tts import PiperVoiceEngine  # noqa: E402
 from device.ws_client import ConnectionLost, GatewayClient  # noqa: E402
 
 log = logging.getLogger("ideraldinho.device")
+
+#: Quem fez a pergunta que ficou no ar ao fim do turno. A resposta volta para
+#: quem perguntou, e são dois lugares diferentes: o gateway tem o histórico da
+#: conversa com o LLM; o serviço local não passa por lá e resolve aqui mesmo.
+PERGUNTA_GATEWAY = "gateway"
+PERGUNTA_LOCAL = "local"
 
 
 async def read_line(prompt: str) -> str:
@@ -68,16 +80,24 @@ async def speak(voice, speaker, text: str) -> float:
     return time.perf_counter() - started
 
 
-async def listen_and_transcribe(microphone: Microphone, stt, machine: StateMachine) -> str:
+async def listen_and_transcribe(
+    microphone: Microphone, stt, machine: StateMachine, janela: float | None = None
+) -> str:
     """Uma fala: grava até o silêncio, transcreve, devolve o texto.
 
     As duas etapas bloqueiam e vão para threads pela mesma razão da síntese: o
     laço de eventos tem que continuar atendendo o socket.
+
+    `janela` é quanto esperar a fala começar quando o aparelho acabou de fazer
+    uma pergunta. Sem ela vale a espera normal do microfone. Nos dois casos o
+    silêncio devolve vazio e a máquina volta para IDLE sem dizer nada.
     """
     machine.transition(State.LISTENING)
-    print("  [fale]", end="", flush=True)
+    print("  [pode responder]" if janela else "  [fale]", end="", flush=True)
     pcm = await asyncio.to_thread(
-        microphone.listen, lambda: print("\r  [ouvindo...]", end="", flush=True)
+        microphone.listen,
+        lambda: print("\r  [ouvindo...]     ", end="", flush=True),
+        start_timeout=janela,
     )
     if not pcm:
         print("\r  [silencio]      ")
@@ -112,8 +132,14 @@ async def esperar_ativacao(microphone: Microphone, wake) -> None:
 
 async def handle_incoming(
     client: GatewayClient, machine: StateMachine, voice, speaker, falando, services
-) -> None:
-    """Aplica o que o gateway manda: estado, texto para falar, chamadas de ferramenta."""
+) -> bool:
+    """Aplica o que o gateway manda: estado, texto para falar, chamadas de ferramenta.
+
+    Devolve se o turno terminou numa pergunta (`expects_reply` no `idle`). As
+    frases são faladas uma a uma, dentro deste laço, antes de a mensagem
+    seguinte ser lida -- então quando o `idle` é processado o aparelho já parou
+    de falar, e reabrir o microfone não pega a própria voz.
+    """
     spoke_at = None
 
     async for message in client.receive():
@@ -127,7 +153,9 @@ async def handle_incoming(
             if message.value != machine.state:
                 machine.transition(message.value)
             if message.value is State.IDLE:
-                return  # turno terminou; volta para o prompt
+                # Turno terminou; volta para o prompt. Um gateway que nunca
+                # manda o campo cai aqui com `None`, que é o "não" de sempre.
+                return bool(message.expects_reply)
 
         elif isinstance(message, Transcript):
             if message.role == "user":
@@ -161,7 +189,9 @@ async def handle_incoming(
             # estado tem saída legal para IDLE, então não há caminho a escolher.
             if machine.state is not State.IDLE:
                 machine.transition(State.IDLE)
-            return
+            return False
+
+    return False
 
 
 async def run(text_mode: bool, abrir_rosto: bool = False) -> None:
@@ -295,7 +325,13 @@ def executar_ferramenta(services, call: ToolCall) -> ToolResult:
 
     if resposta is None:
         return ToolResult(id=call.id, ok=False, error="intencao nao reconhecida")
-    return ToolResult(id=call.id, ok=True, value=resposta)
+    # A frase pode ser uma pergunta ("Qual eu cancelo?"). O gateway a entrega
+    # como está, sem saber o que ela é; o aviso sobe junto para ele poder pedir
+    # a janela de resposta no fim do turno.
+    return ToolResult(
+        id=call.id, ok=True, value=resposta,
+        expects_reply=True if pede_resposta(resposta) else None,
+    )
 
 
 def _ate_falar(machine: StateMachine) -> None:
@@ -314,8 +350,14 @@ def _ate_falar(machine: StateMachine) -> None:
         machine.transition(State.SPEAKING)
 
 
-async def answer(client, machine, voice, speaker, services, falando, text: str) -> None:
+async def answer(
+    client, machine, voice, speaker, services, falando, text: str, pergunta: str | None = None
+) -> str | None:
     """Conduz o turno: nível 0 aqui, o resto no gateway.
+
+    `pergunta` diz que `text` é a resposta a uma pergunta do turno anterior, e
+    de quem. O retorno é a mesma coisa para o turno seguinte: quem ficou
+    esperando resposta agora, ou `None`.
 
     A ordem importa. Tentar o roteador antes da rede é o que dá ao timer a
     latência que o plano orça (< 200 ms) e o que faz o alarme continuar
@@ -325,7 +367,19 @@ async def answer(client, machine, voice, speaker, services, falando, text: str) 
     daquele turno se perdeu com a `Session` do gateway. Dizer isso em voz alta e
     voltar a ouvir é melhor que morrer com traceback numa prateleira.
     """
-    intent = match_intent(text)
+    if pergunta == PERGUNTA_GATEWAY:
+        # Quem perguntou foi o gateway, e a resposta é dele. O roteador não
+        # olha: "cancela" respondendo a "Confirma?" é um "não", e o regex o
+        # leria como "cancela o timer".
+        intent = None
+    elif pergunta == PERGUNTA_LOCAL:
+        # Quem perguntou foi o serviço local, e o gateway nem viu a pergunta.
+        # Se a frase não serve de resposta, ela é um turno novo como outro
+        # qualquer -- a pessoa mudou de assunto.
+        intent = responder_qual_cancelar(text) or match_intent(text)
+    else:
+        intent = match_intent(text)
+
     if intent is not None:
         resposta = services.handle(intent)
         if resposta is not None:
@@ -334,14 +388,15 @@ async def answer(client, machine, voice, speaker, services, falando, text: str) 
             async with falando:
                 await speak(voice, speaker, resposta)
             machine.transition(State.IDLE)
-            return
+            return PERGUNTA_LOCAL if pede_resposta(resposta) else None
 
     # Nível 2: o que o roteador não reconheceu. Registrar a frase é o que, em um
     # mês, diz quais intenções merecem virar nível 0 (plano, seção 5, regra 4).
     log.info("nivel 2 (subiu para o LLM): %r", text)
     try:
         await client.send_utterance(text)
-        await handle_incoming(client, machine, voice, speaker, falando, services)
+        espera = await handle_incoming(client, machine, voice, speaker, falando, services)
+        return PERGUNTA_GATEWAY if espera else None
     except ConnectionLost as exc:
         log.warning("turno perdido: %s", exc)
         # Com o gateway fora, o nível 0 continua de pé -- e dizer isso é melhor
@@ -353,33 +408,55 @@ async def answer(client, machine, voice, speaker, services, falando, text: str) 
                 "Nao consigo falar com o servidor agora. Timer e alarme continuam funcionando.",
             )
         machine.transition(State.IDLE)
+        return None
 
 
 async def text_loop(client, machine, voice, speaker, services, falando) -> None:
+    # No teclado não há nome a exigir nem relógio a correr: a janela vira "a
+    # próxima linha é a resposta", e o prompt muda para dizer isso. Uma linha
+    # vazia faz o papel do silêncio e desiste da pergunta. Sem tempo limite de
+    # propósito -- o `input` roda numa thread que não se cancela, e quem digita
+    # não é a televisão.
+    pergunta = None
     while True:
-        text = (await read_line("voce: ")).strip()
+        text = (await read_line("resposta: " if pergunta else "voce: ")).strip()
         if not text:
+            pergunta = None
             continue
         # O aparelho esteve ouvindo o tempo todo -- aqui foi o teclado, mas o
         # estado é o mesmo, e é o que mantém a máquina válida nos dois modos.
         machine.transition(State.LISTENING)
-        await answer(client, machine, voice, speaker, services, falando, text)
+        pergunta = await answer(
+            client, machine, voice, speaker, services, falando, text, pergunta
+        )
 
 
 async def voice_loop(
     client, machine, microphone, stt, voice, speaker, services, falando, wake=None
 ) -> None:
+    # Quem está esperando resposta, se alguém. Enquanto houver, o aparelho pula
+    # a espera pelo nome e ouve por uma janela curta: ter que dizer "Ideraldinho"
+    # de novo para responder "o timer" é o que impedia o assistente de perguntar.
+    pergunta = None
     while True:
-        if wake is not None:
+        if wake is not None and pergunta is None:
             # O reset é antes da espera, e não depois do turno: o modelo guarda
             # estado entre blocos, e o que sobrou ali é a resposta que o próprio
             # aparelho acabou de falar.
             wake.reset()
             await esperar_ativacao(microphone, wake)
-        text = await listen_and_transcribe(microphone, stt, machine)
+        text = await listen_and_transcribe(
+            microphone, stt, machine, config.reply_window_s if pergunta else None
+        )
         if not text:
+            # Ninguém respondeu dentro da janela: a pergunta caduca em
+            # silêncio. Também vale sem wake word -- senão um "cancela" dito
+            # dez minutos depois ainda seria lido como resposta.
+            pergunta = None
             continue
-        await answer(client, machine, voice, speaker, services, falando, text)
+        pergunta = await answer(
+            client, machine, voice, speaker, services, falando, text, pergunta
+        )
 
 
 def main() -> None:

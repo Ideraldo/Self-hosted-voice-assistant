@@ -62,6 +62,11 @@ class DeviceConfig:
     # acorda com a televisao. 0.5 e o ponto de partida do openWakeWord, e
     # `python -m scripts.wake` existe para acha-lo ouvindo.
     wake_threshold: float = float(os.getenv("WAKE_THRESHOLD", "0.5"))
+    # Janela de continuacao: quando o assistente termina o turno com uma
+    # pergunta, o microfone reabre por este tempo sem exigir o nome. Curta de
+    # proposito -- e o unico momento em que o aparelho ouve sem ser chamado, e
+    # cada segundo a mais e um segundo de televisao que pode virar "resposta".
+    reply_window_s: float = float(os.getenv("REPLY_WINDOW_S", "8"))
     vad_silence_ms: int = int(os.getenv("VAD_SILENCE_MS", "700"))
     vad_aggressiveness: int = int(os.getenv("VAD_AGGRESSIVENESS", "3"))
     simulated_latency_ms: int = int(os.getenv("SIMULATED_LATENCY_MS", "0"))

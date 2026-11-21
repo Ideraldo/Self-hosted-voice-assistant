@@ -84,6 +84,10 @@ class ToolResult:
     ok: bool
     value: str | None = None
     error: str | None = None
+    #: A frase devolvida é uma pergunta ("Qual eu cancelo?"). Quem sabe disso é
+    #: quem a redigiu -- o dispositivo --, e o gateway só repassa o aviso no fim
+    #: do turno (`StateMessage.expects_reply`). Ausente quer dizer "não".
+    expects_reply: bool | None = None
     type: Literal["tool_result"] = "tool_result"
 
 
@@ -96,6 +100,17 @@ class StateMessage:
     #: Opcional: ausente quer dizer "não mudou", e não "neutro". Quem não manda
     #: nada deixa o rosto como está, que é o que todo o gateway faz hoje.
     emotion: Emotion | None = None
+    #: Só faz sentido junto de `idle`, a mensagem que encerra o turno: "eu fiz
+    #: uma pergunta, a próxima fala é a resposta". O dispositivo reabre o
+    #: microfone por alguns segundos sem exigir o nome e manda o que ouvir
+    #: direto para cá, sem passar pelo roteador de nível 0 -- senão o "cancela"
+    #: dito em resposta a "Confirma?" cancelaria um timer.
+    #:
+    #: Viaja no `idle`, e não no transcript final, porque o `idle` existe em todo
+    #: turno (o transcript final some quando a resposta é vazia) e é nele que o
+    #: dispositivo já decide o que fazer em seguida. Ausente é o comportamento
+    #: de sempre.
+    expects_reply: bool | None = None
     type: Literal["state"] = "state"
 
     def __post_init__(self) -> None:
