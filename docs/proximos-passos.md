@@ -128,7 +128,7 @@ podem andar em paralelo.
 | **A5** | Documentação alinhada ao código | — | nenhuma das divergências levantadas ao desenhar a arquitetura continua aberta | P |
 | **A6** | Gastos por voz: (a) cliente MCP e autorização; (b) parser de dinheiro, valor e data por extenso; (c) ferramentas, pendência, confirmação, diário | A1, A4 | com servidor falso, nenhum caminho grava sem confirmação; com o real, 20 lançamentos de teste conferidos no app e desfeitos por voz | G |
 | **A7** | Bancada de finanças: as medidas da tabela acima, sobre gravações minhas | A6 | os números, com data, em `lab/RESULTS.md` | M |
-| **A8** | Modo tradutor no dispositivo | resultado de `lab/traducao/` | a definir com o número da bancada | M |
+| **A8** | Modo tradutor no dispositivo: o par base opus-mt em CTranslate2, com corte por oração obrigatório ([resultado](../lab/RESULTS.md)) | medir Whisper → tradutor nas gravações reais | a tradução de uma frase curta em menos de 300 ms no PC limitado a 2 threads, e nenhuma oração descartada | M |
 | **A9** | Wake word: falso positivo por hora com microfone e sala reais; e um v4 treinado com muitas vozes | microfone (manual); chave de TTS para as vozes | menos de 1 falso positivo por hora; o v4 só substitui o v3 se mantiver 94% e melhorar com vozes de terceiros | M |
 
 Sobre o A9: o v2 já aprendeu a palavra errada uma vez com dado sintético (D31).

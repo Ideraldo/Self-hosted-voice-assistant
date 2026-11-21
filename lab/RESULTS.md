@@ -1,4 +1,4 @@
-# Resultados — STT e TTS
+# Resultados — STT, TTS e tradução
 
 Registro vivo. Cada motor testado ganha uma linha; a coluna **Ouvido** é sua e
 vale mais que as outras.
@@ -277,3 +277,74 @@ Repetir sobre a sua voz:
    resolvem a tensão da seção acima sem concessão de qualidade
 5. wav2vec2 com decoder kenlm, direto na Pi
 6. Medir o vencedor com streaming, cronometrando o primeiro chunk
+
+---
+
+## Tradução — pt-BR ↔ en (texto, triagem)
+
+A peça do meio do modo tradutor. Runner, conjunto de frases e comandos em
+[`lab/traducao/`](traducao/README.md).
+
+**Isto é triagem, não veredito.** Medido em 21/11/2026 sobre **texto limpo** (62
+pares escritos à mão em `lab/traducao/frases.py`), num contêiner de nuvem — Xeon
+2,1 GHz com AVX-512/VNNI, 4 vCPUs, Python 3.13, ctranslate2 4.9.0. Não é a minha
+voz, não passou pelo Whisper e **não é a Pi**. Tudo int8, beam 4, uma frase por
+chamada, entrada cortada em orações (`--split`).
+
+| | Sentido | Modelo | Disco | RAM | 2 th: med / p90 | 1 th: med / p90 | chrF | pt-PT |
+|---|---|---|---|---|---|---|---|---|
+| **→** | pt→en | **opus-mt-ROMANCE-en** | 84 MB | 127 MB | 78 / 121 ms | 141 / 213 ms | 75,7 | – |
+| | pt→en | opus-mt-tc-bible-big-roa-en | 243 MB | 290 MB | 155 / 221 ms | 276 / 404 ms | **80,1** | – |
+| | pt→en | ~~NLLB-200 600M~~ *(teto)* | 651 MB | 745 MB | 634 / 942 ms | 1140 / 1652 ms | 73,8 | – |
+| **→** | en→pt | **opus-mt-en-ROMANCE `>>pt_BR<<`** | 84 MB | 127 MB | 80 / 127 ms | 151 / 238 ms | **71,6** | 0 |
+| | en→pt | opus-mt-tc-big-en-pt `>>pob<<` | 240 MB | 290 MB | 133 / 197 ms | 245 / 367 ms | **71,6** | 0 |
+| | en→pt | opus-mt-en-roa `>>por<<` | 79 MB | 118 MB | 73 / 109 ms | 125 / 199 ms | 62,2 | 15 |
+| | en→pt | ~~NLLB-200 600M~~ *(teto)* | 651 MB | 745 MB | 567 / 880 ms | 1050 / 1616 ms | 66,9 | 11 |
+
+*pt-PT* = frases da saída (de 62) com marca inequívoca de português europeu.
+Carga: 0,2 s nos base, 0,4–0,5 s nos big, ~1 s no NLLB. Latência com ±30% de
+ruído entre rodadas: havia outros processos na máquina.
+
+```powershell
+.\.venv\Scripts\python.exe -m lab.traducao.run_traducao --model all --direction both --threads 2,1 --split --save
+```
+
+**O par base segue adiante:** `opus-mt-ROMANCE-en` e `opus-mt-en-ROMANCE` com
+`>>pt_BR<<`. 84 MB e ~127 MB de RAM cada. O big de pt→en ganha 4 pontos de chrF
+e acerta "round-trip tickets" e "Rua Augusta" onde o base erra — fica de plano B
+se sobrar folga na Pi.
+
+**Uma oração por vez, sempre.** Todos os modelos, NLLB inclusive, traduzem uma
+oração e jogam a outra fora, sem erro: "Está muito caro. Tem desconto?" →
+"It's too expensive." Sem o corte, o chrF cai de 75,7 para 70,9 (pt→en base).
+O corte depende de o Whisper pontuar — não medido.
+
+**A etiqueta é a variante.** `>>pt_BR<<` e `>>pob<<` saem brasileiros. `>>pt<<`,
+`>>por<<` e o NLLB saem europeus ("casa de banho", "autocarro", "De onde és?").
+`>>pt_PT<<` do en-ROMANCE está quebrada: "La maleta non arrivò." E `>>pt_br<<`
+minúscula é outro comportamento — estilo de legenda, mais enxuto.
+
+**Não existem** `opus-mt-pt-en`, `opus-mt-en-pt` nem `opus-mt-tc-big-pt-en`: o
+português entra sempre dentro de um modelo românico. `opus-mt-roa-en` é o mesmo
+arquivo que o `ROMANCE-en` (mesmo md5).
+
+**NLLB confirmado como não-candidato** — 7 a 8× mais lento, 6× a RAM, licença não
+comercial — e nem teto foi aqui: em frase curta falada ficou abaixo dos Marian
+nos dois sentidos.
+
+**Onde todos erram:** expressão idiomática ("me deu um bolo" → "gave me a cake",
+"me vê uma água" → "he sees me"), hora por extenso ("quinze para as sete" →
+"fifteen to seven" / "five o'clock"), "change" → "mudança", "check" → "cheque".
+O coloquial brasileiro sai entendível, mas formal. O chrF tem uma referência só
+por frase e pune tradução certa com outras palavras: serve para ranquear, não
+como nota.
+
+**Threads:** nesta VM, 4 threads foram mais lentas que 1 nos modelos pequenos
+(210 contra 128 ms); 2 foi o melhor ponto. É custo de sincronização com frase
+curta. Na Pi, medir 1, 2 e 4.
+
+Em aberto, em ordem: (1) Whisper → tradutor sobre as gravações reais, e se a
+pontuação do Whisper sustenta o corte por oração; (2) tudo isso na Pi, junto com
+o Whisper e o Piper na memória; (3) `pt_BR` × `pt_br` no ouvido; (4) chinês —
+`opus-mt-zh-en` e `opus-mt-en-zh` existem, `pt-zh` direto não, então seria pivô
+pelo inglês: dois modelos, latência dobrada, erro composto.
