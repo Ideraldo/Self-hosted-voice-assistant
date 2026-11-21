@@ -126,6 +126,22 @@ class Session:
             + (SPOTIFY_TOOLS if spotify is not None else [])
             + (SEARCH_TOOLS if search is not None else [])
         )
+        # Ver `_pedir_resposta`. Vale por um turno só: `_turn` zera no começo.
+        self._expects_reply = False
+
+    def _pedir_resposta(self) -> None:
+        """Marca que este turno termina numa pergunta ao usuário.
+
+        Quem chama é o caminho de código que **sabe** que perguntou -- hoje o
+        cancelamento ambíguo, amanhã a confirmação antes de lançar uma despesa.
+        O `idle` do fim do turno leva o aviso e o dispositivo reabre o
+        microfone sem exigir o nome.
+
+        É explícito de propósito. Adivinhar pelo "?" no texto do modelo abriria
+        o microfone a cada "Posso ajudar em mais alguma coisa?", e microfone
+        aberto sem wake word é exatamente o que a televisão aproveita.
+        """
+        self._expects_reply = True
 
     async def run(self) -> None:
         await self._ws.accept()
@@ -163,6 +179,7 @@ class Session:
             return
 
         turn = Turn()
+        self._expects_reply = False
         await self._send(StateMessage(value=State.THINKING))
         # Eco do que foi entendido: o rosto mostra a transcrição, e quem lê o log
         # do gateway vê a frase que gerou a resposta.
@@ -196,7 +213,12 @@ class Session:
             # terminal não cai aqui: a frase dela é a resposta.
             self._conversation.rollback(antes)
 
-        await self._send(StateMessage(value=State.IDLE))
+        # `None`, e não `False`, quando ninguém perguntou: o campo nem vai para
+        # o fio, e o turno comum continua idêntico ao de antes dele existir.
+        # Turno sem resposta (o modelo caiu no meio) também não pergunta nada,
+        # mesmo que uma ferramenta tenha pedido antes da queda.
+        perguntou = self._expects_reply and bool(answer)
+        await self._send(StateMessage(value=State.IDLE, expects_reply=True if perguntou else None))
         turn.report()
 
     async def _receive_utterance(self) -> str:
@@ -363,6 +385,10 @@ class Session:
 
         if not result.ok:
             return f"falhou: {result.error or 'erro desconhecido'}"
+        if result.expects_reply:
+            # A frase que o dispositivo redigiu é uma pergunta ("Qual eu
+            # cancelo?"). Só ele sabe disso; aqui o aviso só muda de mão.
+            self._pedir_resposta()
         return result.value or "feito"
 
     async def _receive_tool_result(self, call_id: str) -> ToolResult:

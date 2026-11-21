@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 
 from device.local.store import Schedule, ScheduleStore
-from device.router.intents import Intent
+from device.router.intents import Intent, normalize
 
 #: Frases fixas. A regra 2 do plano manda pré-sintetizar as respostas do nível 0
 #: para o aparelho parecer instantâneo. Com o Piper em RTF 0,05 isso ainda não
@@ -23,6 +23,36 @@ from device.router.intents import Intent
 #: e não f-strings espalhadas.
 NADA_PARA_CANCELAR = "Nao tem nada marcado."
 QUAL_CANCELAR = "Voce tem mais de um. Qual eu cancelo?"
+
+#: As frases acima que são perguntas. Depois de falar uma delas o aparelho
+#: reabre o microfone para ouvir a resposta (janela de continuação), e é por
+#: esta lista -- e não procurando "?" no texto -- que ele sabe que perguntou.
+PERGUNTAS: frozenset[str] = frozenset({QUAL_CANCELAR})
+
+
+def pede_resposta(frase: str | None) -> bool:
+    """A frase que o serviço devolveu é uma pergunta ao usuário?"""
+    return frase in PERGUNTAS
+
+
+def responder_qual_cancelar(texto: str) -> Intent | None:
+    """Lê a resposta a "Qual eu cancelo?" e devolve o cancelamento com alvo.
+
+    A resposta natural é "o timer", e isso não é comando nenhum: o roteador não
+    casa, a frase subiria para o LLM, e o LLM nunca viu a pergunta -- o diálogo
+    de nível 0 não passa pelo gateway. Então quem perguntou é quem interpreta.
+
+    `None` é "não entendi como resposta": o chamador trata a frase como um
+    turno novo qualquer.
+    """
+    palavras = set(normalize(texto).split())
+    quer_timer = bool(palavras & {"timer", "timers", "cronometro"})
+    quer_alarme = bool(palavras & {"alarme", "alarmes"})
+    if quer_timer == quer_alarme:
+        # Nenhum dos dois, ou os dois: escolher seria o chute que a pergunta
+        # existiu para evitar.
+        return None
+    return Intent(name="cancelar", slots={"alvo": "timer" if quer_timer else "alarme"}, text=texto)
 
 
 class LocalServices:

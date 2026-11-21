@@ -104,8 +104,12 @@ class Microphone:
         while self._stream.read_available >= self._frame_samples:
             self._read()
 
-    def listen(self, on_start=None) -> bytes:
+    def listen(self, on_start=None, start_timeout: float | None = None) -> bytes:
         """Grava uma fala e devolve o PCM.
+
+        ``start_timeout`` troca, só nesta chamada, o tempo de espera pelo começo
+        da fala: a janela de resposta a uma pergunta é bem mais curta que a
+        espera normal.
 
         Devolve vazio se ninguém falar dentro de ``start_timeout``. Esperar para
         sempre seria mais simples, mas a captura roda numa thread e um Ctrl+C
@@ -113,6 +117,8 @@ class Microphone:
         controle ao laço.
         """
         self._flush()
+        if start_timeout is None:
+            start_timeout = self.start_timeout
 
         needed_silence = self.silence_ms // FRAME_MS
         needed_speech = 3  # frames de voz seguidos antes de comprometer
@@ -152,7 +158,7 @@ class Microphone:
                     collected.extend(f for f in preroll if f)
                     if on_start is not None:
                         on_start()
-                elif elapsed > self.start_timeout:
+                elif elapsed > start_timeout:
                     return b""
                 continue
 
