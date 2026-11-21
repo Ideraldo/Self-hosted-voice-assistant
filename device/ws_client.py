@@ -6,8 +6,10 @@ VPS must be nothing more than changing GATEWAY_URL.
 
 O link cai. Na mesa isso quase nunca acontece; numa Pi na prateleira, com o
 gateway do outro lado do Wi-Fi, é questão de quando. Por isso o cliente
-reconecta sozinho, com espera crescente, e o aparelho volta a ouvir em vez de
-morrer com traceback.
+reconecta sozinho na próxima frase que precisar subir, com espera crescente
+dentro de um orçamento, e o aparelho volta a ouvir em vez de morrer com
+traceback. Não há reconexão em segundo plano: sem frase para entregar, ninguém
+tenta.
 """
 
 from __future__ import annotations
@@ -36,8 +38,10 @@ BACKOFF_CAP = 30.0
 #: Quanto tempo insistir quando há alguém esperando resposta. Depois da Fase 2 o
 #: aparelho não precisa mais do gateway para existir -- timer, alarme e hora são
 #: locais --, então ficar preso tentando reconectar é pior que dizer "não deu" e
-#: voltar a ouvir. A retentativa sem fim continua valendo para o que roda ao
-#: fundo, não para o turno de alguém que está parado esperando (D14).
+#: voltar a ouvir. São só dois pontos de conexão: uma tentativa única no boot
+#: (`budget=0`) e esta insistência no envio de uma frase. Não existe reconexão
+#: em segundo plano -- a retentativa sem fim de D14 (`budget=None`) continua no
+#: `_connect`, mas nenhum chamador a usa hoje.
 CONNECT_BUDGET = 8.0
 
 
@@ -98,9 +102,10 @@ class GatewayClient:
     async def _connect(self, budget: float | None = None) -> None:
         """Conecta e faz o aperto de mão.
 
-        `budget` é quanto tempo insistir: `None` é para sempre (o aparelho de
-        prateleira que não pode depender de alguém para religá-lo), e um número
-        é para quando há uma pessoa esperando do outro lado. Estourando o
+        `budget` é quanto tempo insistir: `None` é para sempre (pensado para o
+        aparelho de prateleira que não pode depender de alguém para religá-lo;
+        nenhum chamador passa `None` hoje), e um número é para quando há uma
+        pessoa esperando do outro lado -- `0` é uma tentativa só. Estourando o
         orçamento levanta `ConnectionLost`, e quem chamou decide o que dizer.
         """
         delay = BACKOFF_START

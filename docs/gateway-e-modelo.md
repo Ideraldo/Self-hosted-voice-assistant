@@ -1,8 +1,8 @@
 # O gateway, o modelo e as ferramentas
 
 O gateway é o processo que fala com o LLM, guarda os segredos e carrega as
-chamadas de ferramenta. Hoje roda com uvicorn no localhost; depois, em Docker
-numa VPS.
+chamadas de ferramenta. No dia a dia roda com uvicorn no localhost; o destino é
+Docker numa VPS, e o contêiner já roda — só não nela ainda.
 
 Decisões relacionadas: [D15](decisions.md), [D16](decisions.md),
 [D18](decisions.md), [D19](decisions.md), [D20](decisions.md),
@@ -10,19 +10,58 @@ Decisões relacionadas: [D15](decisions.md), [D16](decisions.md),
 
 ---
 
-## O contêiner, que ainda não rodou
+## O contêiner: rodou, e o que rodar achou
 
 Autenticação por token e o atraso simulado funcionam hoje
-(`SIMULATED_LATENCY_MS` no `.env`; 80 é wifi, 150 é 4G). **O contêiner está
-escrito e não verificado**, e vai continuar assim até a VPS: a virtualização de
-firmware está desligada nesta máquina por opção, então não há WSL2 nem Docker
-Desktop (D16). A VPS roda Docker Engine no Linux, onde nada disso se aplica.
-Trate o comando abaixo como não testado:
+(`SIMULATED_LATENCY_MS` no `.env`; 80 é wifi, 150 é 4G).
 
-```powershell
+O contêiner passou meses escrito sem rodar: no PC de desenvolvimento a
+virtualização de firmware fica desligada por opção, então não há WSL2 nem Docker
+Desktop (D16). O primeiro `up` foi em 21/11/2026, numa máquina Linux com Docker
+Engine:
+
+```bash
 docker compose -f gateway/docker-compose.yml up --build
 python -m device.main      # inalterado: continua ligando em ws://localhost:8000/ws
 ```
+
+**O que foi verificado:**
+
+- a imagem constrói, com 279 MB;
+- `/health` responde;
+- token errado fecha o WebSocket com 1008;
+- um turno inteiro passa pelo WebSocket;
+- o LLM no host é alcançado por `host.docker.internal`. Isso foi validado contra
+  um Ollama falso: o caminho de rede está provado, o modelo não.
+
+**O que rodar achou, e ler não tinha achado:**
+
+- `gateway/data/` não estava no `.dockerignore`, então `COPY gateway/` levava o
+  refresh token do Spotify para dentro da imagem. Agora está.
+- Não havia volume, e o token morria a cada `up --build` — num contêiner que não
+  tem navegador para autorizar de novo. Agora ele mora no volume nomeado
+  `gateway-data`, e o diretório é criado na imagem já com o usuário não-root
+  como dono, porque o volume herda o dono do diretório da imagem.
+- `docker compose cp` grava o token como root, e aí o gateway não consegue
+  regravá-lo quando o token é renovado. Para levar o token de uma máquina que já
+  autorizou, o compose documenta o caminho pelo `exec`:
+
+  ```bash
+  docker compose -f gateway/docker-compose.yml exec -T gateway \
+      sh -c 'cat > gateway/data/spotify_token.json' \
+      < gateway/data/spotify_token.json
+  ```
+
+O CI (`.github/workflows/ci.yml`) repete isso a cada push: constrói a imagem,
+sobe o compose com o `.env.example`, espera o `/health` e confere que nem o
+`.env` nem o token estão dentro da imagem e que o processo não roda como root.
+O CI não faz turno nenhum — não há modelo lá.
+
+**O que continua sem verificação:**
+
+- numa VPS de verdade;
+- com o modelo real atrás do `host.docker.internal`;
+- no Windows com Docker Desktop.
 
 A imagem instala `requirements-gateway.txt`, não `requirements.txt`. Depois da
 D13 o gateway não guarda modelo nenhum — `gateway/` e `common/` importam fastapi,
@@ -33,8 +72,9 @@ importar.
 
 Duas coisas que só mordem dentro do contêiner, ambas tratadas no compose:
 `localhost` significa o próprio contêiner, então `OLLAMA_URL` é sobrescrito com
-`host.docker.internal`; e esse nome só resolve no Docker Engine para Linux — o
-caso da VPS — por causa da linha `extra_hosts`.
+`host.docker.internal` (ou com `OLLAMA_URL_DOCKER`, se definido — é o que se
+aponta para o modelo na VPS); e esse nome só resolve no Docker Engine para
+Linux — o caso da VPS — por causa da linha `extra_hosts`.
 
 ---
 

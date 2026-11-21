@@ -13,7 +13,10 @@ ALLOWED: dict[State, set[State]] = {
     State.IDLE: {State.LISTENING},
     State.LISTENING: {State.THINKING, State.IDLE},  # IDLE on timeout
     State.THINKING: {State.SPEAKING, State.IDLE},
-    State.SPEAKING: {State.IDLE, State.LISTENING},  # LISTENING on barge-in
+    # SPEAKING -> LISTENING esta reservada para o barge-in, que nao existe:
+    # nada dispara essa transicao hoje, e o microfone descarta o que entrou
+    # enquanto o aparelho falava (`Microphone._flush`).
+    State.SPEAKING: {State.IDLE, State.LISTENING},
 }
 
 #: Quem quer saber que o rosto mudou. Recebe (estado, emoção) já validados.

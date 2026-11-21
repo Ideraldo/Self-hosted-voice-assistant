@@ -271,7 +271,8 @@ class Session:
 
             async for delta in stream():
                 if delta.tool_name:
-                    # A execução é sempre do dispositivo (plano, seção 5, regra 3).
+                    # Quem executa é decidido abaixo, pelo nome: busca e Spotify
+                    # aqui no gateway, o resto no dispositivo (seção 5, regra 3).
                     chamada = (delta.tool_name, delta.tool_args or {})
                     break
                 if not delta.text:

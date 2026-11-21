@@ -1,9 +1,15 @@
 # Wake word
 
 O dispositivo pode esperar pelo próprio nome em vez de escutar tudo. Ele vem
-**desligado** (`WAKE_ENABLED=1` liga), porque os modelos que acompanham o
-openWakeWord são `alexa` e `hey_jarvis` — e um aparelho que atende pelo nome
-errado é pior que um sem wake word nenhum.
+**desligado** (`WAKE_ENABLED=1` liga), e o `WAKE_MODEL` padrão continua sendo
+`hey_jarvis`, um dos que acompanham o openWakeWord.
+
+O modelo do "Ideraldinho" existe — o v3, treinado aqui (D31). O padrão não
+aponta para ele porque ele é um binário fora do git (`lab/models/`,
+[D12](decisions.md)): um clone novo não tem o arquivo, e um padrão que aponta
+para um arquivo ausente não carrega. Ligar o wake word sem trocar o modelo faz o
+aparelho atender por "hey jarvis", o que é pior que não ter wake word nenhum —
+serve para testar o encanamento e mais nada.
 
 Decisões relacionadas: [D30](decisions.md), [D31](decisions.md). O detalhe do
 treino está em [`lab/wakeword/README.md`](../lab/wakeword/README.md).
@@ -17,6 +23,19 @@ treino está em [`lab/wakeword/README.md`](../lab/wakeword/README.md).
 | `WAKE_ENABLED` | `0` | `1` faz o dispositivo esperar o nome antes de escutar |
 | `WAKE_MODEL` | `hey_jarvis` | um nome que vem junto, ou o caminho do seu `.onnx` |
 | `WAKE_THRESHOLD` | `0.5` | o número que nenhum código escolhe por você — ver abaixo |
+
+Para usar o modelo treinado, gere-o com os três comandos da seção de treino
+abaixo (ele sai em `lab/models/wakeword/ideraldinho.onnx`) e aponte o `.env`
+para ele:
+
+```
+WAKE_ENABLED=1
+WAKE_MODEL=lab/models/wakeword/ideraldinho.onnx
+WAKE_THRESHOLD=0.9
+```
+
+O `0.9` é o ponto de partida do `lab/wakeword/README.md`, não um veredito — ver
+o limiar, abaixo.
 
 **Custo, medido nesta máquina (03/09/2026):** 1,0 ms por frame de 30 ms, RTF
 **0,033**, pelo caminho real do dispositivo. A folga para uma Pi cinco vezes mais
