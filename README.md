@@ -20,6 +20,7 @@ Start here, then follow the topic:
 | [`docs/decisions.md`](docs/decisions.md) | where the build diverged from it, and why |
 | [`docs/diario-de-bordo.md`](docs/diario-de-bordo.md) | the narrative: doubts, attempts, what broke |
 | [`docs/repository-structure.md`](docs/repository-structure.md) | what each folder is for |
+| [`docs/arquitetura.md`](docs/arquitetura.md) | the whole application in diagrams: processes, a turn, the protocol, deployment |
 
 Per topic:
 
