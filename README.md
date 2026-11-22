@@ -23,68 +23,17 @@ the expense tools on top of it are next.
 <details>
 <summary>The detailed view: every module in both processes</summary>
 
-```mermaid
-flowchart TB
-    subgraph DEV["Processo 1 — device (python -m device.main)"]
-        MIC["Microfone + VAD<br/>audio/capture.py"]
-        WAKE["Wake word, opcional<br/>activation/wake.py"]
-        STT["STT faster-whisper<br/>stt/"]
-        ROUTER["Roteador nível 0, regex<br/>router/intents.py"]
-        LOCAL["Serviços locais + agendador<br/>local/"]
-        DB[("SQLite<br/>schedules.db")]
-        TTS["TTS Piper<br/>tts/"]
-        SPK["Alto-falante<br/>audio/playback.py"]
-        SM["Máquina de estados<br/>state.py"]
-        FACE["Servidor do rosto<br/>rosto/server.py"]
-        WSC["GatewayClient<br/>ws_client.py"]
-    end
+The subtitle of each card is the file it lives in. Black arrows are local calls
+or plain HTTP, the thick blue ones are the only wire that crosses the network,
+purple is MCP, and dashed means not wired end to end yet.
 
-    PAGE["Navegador<br/>página do rosto"]
+**The device:**
 
-    subgraph GW["Processo 2 — gateway (uvicorn gateway.main:app)"]
-        API["/ws + Session<br/>api/session.py"]
-        CONV["Conversation<br/>prompt de sistema + histórico"]
-        LLMP["LLMProvider<br/>llm/ollama.py"]
-        DTOOLS["device_tools.py<br/>só declara"]
-        SPOT["spotify.py<br/>executa aqui"]
-        SEARCH["search.py<br/>executa aqui"]
-        TOKEN[("spotify_token.json<br/>gateway/data/")]
-    end
+<img src="docs/img/arquitetura-dispositivo.en.svg" alt="The modules of the device process: microphone, wake word, STT, level-0 router, local services with SQLite and the scheduler, TTS, speaker, state machine, face server, and the GatewayClient, the only way out to the gateway" width="100%">
 
-    OLLAMA["Ollama<br/>qwen3:8b"]
-    SPOTAPI["Spotify Web API"]
-    WEB["DuckDuckGo ou Brave"]
+**The gateway:**
 
-    MIC --> WAKE --> STT --> ROUTER
-    ROUTER -->|"casou"| LOCAL
-    ROUTER -->|"não casou"| WSC
-    LOCAL <--> DB
-    LOCAL --> TTS
-    WSC -->|"frases da resposta"| TTS
-    WSC -->|"tool_call"| LOCAL
-    TTS --> SPK
-    SM --> FACE
-    FACE -->|"WebSocket local<br/>state + emotion"| PAGE
-
-    WSC <==>|"um WebSocket, só JSON de texto<br/>nenhum áudio"| API
-
-    API --> CONV
-    API --> LLMP
-    API --> DTOOLS
-    API --> SPOT
-    API --> SEARCH
-    SPOT <--> TOKEN
-    LLMP -->|"HTTP /api/chat"| OLLAMA
-    SPOT -->|"HTTPS"| SPOTAPI
-    SEARCH -->|"HTTPS"| WEB
-
-    classDef local fill:#d8f3dc,stroke:#2d6a4f,color:#111
-    classDef servidor fill:#dbe9ff,stroke:#1d4e89,color:#111
-    classDef internet fill:#ffe5d0,stroke:#b3541e,color:#111
-    class MIC,WAKE,STT,ROUTER,LOCAL,DB,TTS,SPK,SM,FACE,PAGE local
-    class WSC,API,CONV,LLMP,DTOOLS,SPOT,SEARCH,TOKEN,OLLAMA servidor
-    class SPOTAPI,WEB internet
-```
+<img src="docs/img/arquitetura-gateway.en.svg" alt="The modules of the gateway process: the Session with its history and timings, the LLM provider with a fallback, the schedule, music and search tools, the not-yet-wired expenses-by-voice group, and the outside services each one reaches" width="100%">
 
 </details>
 

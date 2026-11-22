@@ -8,6 +8,13 @@ Os diagramas foram tirados do código, não dos outros documentos. Quando eu
 mudar `device/main.py`, `gateway/api/session.py` ou `common/messages.py`, é
 aqui que o desenho tem que mudar junto.
 
+Os desenhos de arquitetura e de implantação saem de
+[`docs/diagramas/gerar.py`](diagramas/gerar.py), que escreve os SVG em
+`docs/img/`. Sequência, estados e fluxogramas continuam em Mermaid, que é a
+notação de costume para eles. Nos fluxogramas as cores dizem a mesma coisa que
+nas figuras: cinza é passo local, amarelo é decisão, azul é o que cruza a rede
+ou depende do gateway, vermelho é falha.
+
 Decisões relacionadas: [D1](decisions.md), [D7](decisions.md),
 [D13](decisions.md), [D14](decisions.md), [D17](decisions.md),
 [D18](decisions.md), [D21](decisions.md), [D22](decisions.md),
@@ -41,84 +48,51 @@ gasto por voz em cima dele são o próximo passo
 
 ## 1. Visão geral
 
-```mermaid
-flowchart TB
-    subgraph DEV["Processo 1 — device (python -m device.main)"]
-        MIC["Microfone + VAD<br/>audio/capture.py"]
-        WAKE["Wake word, opcional<br/>activation/wake.py"]
-        STT["STT faster-whisper<br/>stt/"]
-        ROUTER["Roteador nível 0, regex<br/>router/intents.py"]
-        LOCAL["Serviços locais + agendador<br/>local/"]
-        DB[("SQLite<br/>schedules.db")]
-        TTS["TTS Piper<br/>tts/"]
-        SPK["Alto-falante<br/>audio/playback.py"]
-        SM["Máquina de estados<br/>state.py"]
-        FACE["Servidor do rosto<br/>rosto/server.py"]
-        WSC["GatewayClient<br/>ws_client.py"]
-    end
+Os dois processos abertos, módulo por módulo. O subtítulo de cada cartão é o
+arquivo onde ele mora. São duas figuras porque numa só o texto ficaria pequeno
+demais para ler; o que as liga é o WebSocket, que aparece nas duas.
 
-    PAGE["Navegador<br/>página do rosto"]
+**O dispositivo:**
 
-    subgraph GW["Processo 2 — gateway (uvicorn gateway.main:app)"]
-        API["/ws + Session<br/>api/session.py"]
-        CONV["Conversation<br/>prompt de sistema + histórico"]
-        LLMP["LLMProvider<br/>llm/ollama.py"]
-        DTOOLS["device_tools.py<br/>só declara"]
-        SPOT["spotify.py<br/>executa aqui"]
-        SEARCH["search.py<br/>executa aqui"]
-        TOKEN[("spotify_token.json<br/>gateway/data/")]
-    end
+<img src="img/arquitetura-dispositivo.pt.svg" alt="Os módulos do processo do dispositivo: microfone, wake word, STT, roteador de nível 0, serviços locais com SQLite e agendador, TTS, alto-falante, máquina de estados, servidor do rosto e o GatewayClient, que é a única saída para o gateway" width="100%">
 
-    OLLAMA["Ollama<br/>qwen3:8b"]
-    SPOTAPI["Spotify Web API"]
-    WEB["DuckDuckGo ou Brave"]
+**O gateway:**
 
-    MIC --> WAKE --> STT --> ROUTER
-    ROUTER -->|"casou"| LOCAL
-    ROUTER -->|"não casou"| WSC
-    LOCAL <--> DB
-    LOCAL --> TTS
-    WSC -->|"frases da resposta"| TTS
-    WSC -->|"tool_call"| LOCAL
-    TTS --> SPK
-    SM --> FACE
-    FACE -->|"WebSocket local<br/>state + emotion"| PAGE
+<img src="img/arquitetura-gateway.pt.svg" alt="Os módulos do processo do gateway: a Session com o histórico e os tempos, o provedor de LLM com reserva, as ferramentas de agenda, música e busca, o grupo ainda não ligado dos gastos por voz, e os serviços de fora que cada um alcança" width="100%">
 
-    WSC <==>|"um WebSocket, só JSON de texto<br/>nenhum áudio"| API
-
-    API --> CONV
-    API --> LLMP
-    API --> DTOOLS
-    API --> SPOT
-    API --> SEARCH
-    SPOT <--> TOKEN
-    LLMP -->|"HTTP /api/chat"| OLLAMA
-    SPOT -->|"HTTPS"| SPOTAPI
-    SEARCH -->|"HTTPS"| WEB
-
-    classDef local fill:#d8f3dc,stroke:#2d6a4f,color:#111
-    classDef servidor fill:#dbe9ff,stroke:#1d4e89,color:#111
-    classDef internet fill:#ffe5d0,stroke:#b3541e,color:#111
-    class MIC,WAKE,STT,ROUTER,LOCAL,DB,TTS,SPK,SM,FACE,PAGE local
-    class WSC,API,CONV,LLMP,DTOOLS,SPOT,SEARCH,TOKEN,OLLAMA servidor
-    class SPOTAPI,WEB internet
-```
+As convenções são as mesmas da figura de cima: seta preta é chamada local ou
+HTTP comum, seta azul grossa é o que cruza a rede, roxo é MCP, e tracejado é o
+que ainda não está ligado de ponta a ponta.
 
 O que notar:
 
-- **Verde funciona sem rede nenhuma.** Microfone, wake word, STT, roteador,
-  timers e alarmes, TTS e rosto estão todos no processo do dispositivo. É por
-  isso que ele liga e responde "que horas são" com o gateway desligado (D17).
-- **Azul precisa do gateway**, mas não da internet: hoje o Ollama roda na mesma
-  máquina.
-- **Laranja precisa da internet.** Só o gateway fala com o Spotify e com o
-  buscador; o segredo do Spotify mora em `gateway/data/` e nunca desce (D21).
-- **A seta grossa é a única coisa que cruza a rede** entre os dois processos:
-  um WebSocket, com mensagens JSON de texto. O áudio nasce e morre no
-  dispositivo (D7, D13). Se chegar um frame binário, os dois lados reclamam em
-  vez de tocar.
+- **Tudo dentro da zona do dispositivo funciona sem rede nenhuma.** Microfone,
+  wake word, STT, roteador, timers e alarmes, TTS e rosto estão todos no mesmo
+  processo. É por isso que ele liga e responde "que horas são" com o gateway
+  desligado (D17).
+- **O gateway precisa do LLM, mas não necessariamente da internet:** hoje o
+  Ollama roda na mesma máquina. Spotify e busca, esses sim, são internet. Só o
+  gateway fala com eles; o segredo do Spotify mora em `gateway/data/` e nunca
+  desce (D21).
+- **As setas azuis são a única coisa que cruza a rede** entre os dois
+  processos: um WebSocket, com mensagens JSON de texto — os sete tipos escritos
+  ao lado da pílula. O áudio nasce e morre no dispositivo (D7, D13). Se chegar
+  um frame binário, os dois lados reclamam em vez de tocar.
 - O `tool_call` volta pelo mesmo WebSocket e termina em `local/`, o mesmo
-  código que o roteador de regex usa (D18).
+  código que o roteador de regex usa (D18). No gateway, `device_tools.py` só
+  declara essas ferramentas: quem executa é o dispositivo.
+- **O wake word tem um atalho por cima.** É o caminho padrão
+  (`WAKE_ENABLED=0`) e também a janela de continuação: depois de uma pergunta
+  do aparelho, ele ouve por 8 s sem exigir o nome (seção 4).
+- **O LLM é um provedor, ou dois em fila.** Sem `LLM_FALLBACK_PROVIDER`, a
+  Session fala com um cliente só — hoje, o do Ollama. Com reserva configurado,
+  `fallback.py` tenta o principal e passa ao outro se ele não começar a
+  responder a tempo. A seta para a nuvem é tracejada porque o cliente existe e
+  é testado contra servidor falso, mas nenhum provedor foi escolhido e medido.
+- **O grupo roxo tracejado existe e tem teste, mas a Session ainda não o
+  chama.** `mcp_client.py` é o transporte MCP e `dinheiro.py` é o parser de
+  valores e datas; as ferramentas de gasto por voz que juntam os dois são o
+  próximo passo ([próximos passos](proximos-passos.md)).
 
 ### Onde mora cada coisa
 
@@ -144,6 +118,8 @@ O que notar:
 | device_tools | `gateway/tools/device_tools.py` | declara as 4 ferramentas de agenda e quais são terminais |
 | spotify | `gateway/tools/spotify.py`, `spotify_auth.py` | 11 ferramentas de música, token e escopo |
 | search | `gateway/tools/search.py` | `buscar_na_internet`, DuckDuckGo, Brave, leitor de página |
+| Cliente MCP | `gateway/tools/mcp_client.py`, `financas_auth.py` | transporte MCP e autorização OAuth do app de finanças; ainda não ligado à Session |
+| Dinheiro falado | `gateway/tools/dinheiro.py` | valor, data e confirmação por extenso, só funções puras; ainda não ligado à Session |
 | Tempos do turno | `gateway/timing.py` | marca e loga cada etapa |
 | Contrato | `common/messages.py`, `common/serialization.py` | os tipos de mensagem e o JSON |
 | Contêiner | `gateway/Dockerfile`, `gateway/docker-compose.yml` | rodou em Linux em 21/11/2026 e roda no CI a cada push; falta a VPS e o modelo real (D16) |
@@ -193,10 +169,11 @@ flowchart TD
     TTS --> SPK --> IDLE
     SM -.->|"a cada transição"| FACE
 
-    classDef local fill:#d8f3dc,stroke:#2d6a4f,color:#111
-    classDef servidor fill:#dbe9ff,stroke:#1d4e89,color:#111
-    class MIC,WAKE,VAD,STT,TECLADO,LOCAL,DB,TTS,SPK,IDLE,AGENDA,SM,FACE local
-    class SOBE,GW,FRASES servidor
+    classDef default fill:#f6f8fa,stroke:#afb8c1,color:#1f2328
+    classDef decisao fill:#fff8c5,stroke:#bf8700,color:#1f2328
+    classDef rede fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    class WAKEON,VAZIO,TEXTO,ROUTER decisao
+    class SOBE,GW,FRASES rede
 ```
 
 O que notar:
@@ -382,6 +359,14 @@ flowchart TD
     TERM -->|"sim"| FALA --> RESTO
     TERM -->|"não: busca"| LLM
     RESTO --> IDLE
+
+    classDef default fill:#f6f8fa,stroke:#afb8c1,color:#1f2328
+    classDef decisao fill:#fff8c5,stroke:#bf8700,color:#1f2328
+    classDef rede fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    classDef falha fill:#ffebe9,stroke:#cf222e,color:#1f2328
+    class DELTA,FIM,TETO,QUAL,TERM decisao
+    class DEVT rede
+    class DESISTE falha
 ```
 
 O que notar:
@@ -418,65 +403,17 @@ O que notar:
 ## 6. Implantação: hoje e o alvo
 
 Dois desenhos. No segundo, borda tracejada quer dizer **planejado, não existe
-ainda** — e lá quase tudo é tracejado.
+ainda** — e lá quase tudo é tracejado. Linha cheia é o que já funciona hoje:
+as setas cheias do segundo desenho são caminhos de código que não mudam com a
+mudança de máquina.
 
 **Hoje:**
 
-```mermaid
-flowchart LR
-    subgraph PC["Um PC com Windows"]
-        direction TB
-        H_PAGE["Rosto<br/>aba do navegador"]
-        H_DEV["device<br/>python -m device.main"]
-        H_GW["gateway<br/>uvicorn, sem contêiner"]
-        H_OLL["Ollama local<br/>qwen3:8b"]
-        H_DEV -->|"127.0.0.1:8080"| H_PAGE
-        H_DEV <==>|"ws://localhost:8000/ws<br/>só texto"| H_GW
-        H_GW -->|"localhost:11434"| H_OLL
-    end
-    H_SPOT["Spotify Web API"]
-    H_WEB["DuckDuckGo ou Brave"]
-    H_CONN["Aparelho Spotify Connect ativo<br/>PC, celular ou Echo Dot"]
-    H_GW -->|"HTTPS"| H_SPOT
-    H_GW -->|"HTTPS"| H_WEB
-    H_SPOT -->|"a música sai aqui"| H_CONN
-
-    classDef existe fill:#d8f3dc,stroke:#2d6a4f,color:#111
-    classDef internet fill:#ffe5d0,stroke:#b3541e,color:#111
-    class H_PAGE,H_DEV,H_GW,H_OLL existe
-    class H_SPOT,H_WEB,H_CONN internet
-```
+<img src="img/implantacao-hoje.pt.svg" alt="Implantação hoje: num único PC com Windows rodam o processo do dispositivo, o gateway via uvicorn e o Ollama local; o gateway alcança a busca e o Spotify pela internet, e a música sai no aparelho Spotify Connect que estiver ativo" width="100%">
 
 **O alvo:**
 
-```mermaid
-flowchart LR
-    subgraph PI["Raspberry Pi 5 — planejada"]
-        direction TB
-        A_DEV["device<br/>o mesmo código"]
-        A_KIOSK["Rosto<br/>Chromium em kiosk"]
-        A_RASP["raspotify / librespot<br/>anunciado como Ideraldinho"]
-        A_FALTA["Ainda por escrever:<br/>botão GPIO, modo tradutor,<br/>ducking, volume,<br/>embeddings no roteador"]
-        A_DEV --> A_KIOSK
-    end
-    subgraph VPS["VPS — planejada"]
-        A_GW["gateway em contêiner<br/>docker compose<br/>volume gateway-data"]
-    end
-    A_LLM["LLM<br/>provedor a escolher"]
-    A_SPOT["Spotify Web API"]
-    A_WEB["DuckDuckGo ou Brave"]
-
-    A_DEV <==>|"GATEWAY_URL<br/>só texto"| A_GW
-    A_GW --> A_LLM
-    A_GW -->|"HTTPS"| A_SPOT
-    A_GW -->|"HTTPS"| A_WEB
-    A_SPOT -.->|"SPOTIFY_DEVICE<br/>casa por nome"| A_RASP
-
-    classDef planejado fill:#f4f4f4,stroke:#666,color:#111,stroke-dasharray: 6 4
-    classDef internet fill:#ffe5d0,stroke:#b3541e,color:#111
-    class A_DEV,A_KIOSK,A_RASP,A_FALTA,A_GW,A_LLM planejado
-    class A_SPOT,A_WEB internet
-```
+<img src="img/implantacao-alvo.pt.svg" alt="Implantação alvo: o dispositivo numa Raspberry Pi com o rosto em kiosk e o raspotify; o gateway em contêiner numa VPS atrás de um proxy TLS; uma API de LLM na nuvem como principal e o Ollama de casa como reserva por túnel; o app de finanças por MCP; e o Spotify tocando na Pi pelo nome" width="100%">
 
 O que notar:
 
@@ -491,8 +428,9 @@ O que notar:
   casa com nenhum aparelho, então a escolha cai para o que estiver ativo na
   conta. Quando o raspotify existir na Pi com esse nome, a mesma configuração
   passa a tocar nela (D23).
-- **Não existe ainda:** a Pi, a VPS, um LLM de nuvem escolhido e medido (o
-  cliente existe, testado só contra servidor falso), o botão GPIO,
+- **Não existe ainda:** a Pi, a VPS e o proxy TLS na frente dela, um LLM de
+  nuvem escolhido e medido (o cliente existe, testado só contra servidor
+  falso), o túnel que deixa o Ollama de casa de reserva, o botão GPIO,
   o modo tradutor, ducking, volume e a similaridade por embeddings no roteador.
   A lista do que espera hardware está no fim do
   [diário de bordo](diario-de-bordo.md).
@@ -528,6 +466,12 @@ flowchart TD
     DUE -->|"sim"| MARCA --> ATRASO
     ATRASO -->|"sim"| CALA --> TICK
     ATRASO -->|"não"| FALA --> TICK
+
+    classDef default fill:#f6f8fa,stroke:#afb8c1,color:#1f2328
+    classDef decisao fill:#fff8c5,stroke:#bf8700,color:#1f2328
+    classDef rede fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    class DUE,ATRASO decisao
+    class TOOL rede
 ```
 
 O que notar:
@@ -585,6 +529,14 @@ flowchart TD
     CHEGOU -->|"sim"| FEITO --> FRASE
     CHEGOU -->|"não, o socket caiu"| PERDIDO
     PERDIDO --> FRASE
+
+    classDef default fill:#f6f8fa,stroke:#afb8c1,color:#1f2328
+    classDef decisao fill:#fff8c5,stroke:#bf8700,color:#1f2328
+    classDef rede fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    classDef falha fill:#ffebe9,stroke:#cf222e,color:#1f2328
+    class BOOTOK,TEM,CHEGOU,RESP,CABE decisao
+    class ENVIA,CONECTA rede
+    class AUTH,PERDIDO falha
 ```
 
 O que notar:
