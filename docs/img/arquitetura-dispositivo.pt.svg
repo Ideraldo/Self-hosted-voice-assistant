@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1310 754" width="1310" height="754" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Os módulos do processo do dispositivo e como se ligam">
+<defs>
+<marker id="ponta-local" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2328"/></marker>
+<marker id="ponta-rede" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0969da"/></marker>
+<marker id="ponta-mcp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8250df"/></marker>
+</defs>
+<rect x="0.75" y="0.75" width="1308.5" height="752.5" rx="16" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/>
+<rect x="120" y="30" width="835" height="694" rx="14" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/><g transform="translate(140,47) scale(0.9166666666666666)" fill="#3776AB"><path d="M11.858 0c-.978.005-1.913.088-2.736.234C6.7.662 6.26 1.558 6.26 3.21v2.182h5.725v.727H4.111c-1.664 0-3.121 1-3.577 2.903-.526 2.181-.549 3.542 0 5.82.407 1.694 1.379 2.902 3.043 2.902h1.969v-2.616c0-1.89 1.635-3.557 3.576-3.557h5.72c1.591 0 2.862-1.31 2.862-2.91v-5.45c0-1.553-1.309-2.718-2.863-2.977A18 18 0 0 0 11.858 0M8.762 1.755c.591 0 1.074.491 1.074 1.095 0 .601-.483 1.087-1.074 1.087A1.08 1.08 0 0 1 7.688 2.85c0-.604.48-1.095 1.074-1.095m9.656 4.364v2.543c0 1.971-1.671 3.63-3.577 3.63H9.122c-1.566 0-2.862 1.34-2.862 2.91v5.452c0 1.551 1.349 2.464 2.862 2.91 1.813.532 3.55.628 5.72 0 1.44-.418 2.862-1.258 2.862-2.91V18.47h-5.719v-.727h8.582c1.664 0 2.284-1.16 2.862-2.903.598-1.793.573-3.518 0-5.819-.41-1.656-1.196-2.903-2.862-2.903zm-3.216 13.807a1.08 1.08 0 0 1 1.074 1.088c0 .604-.48 1.094-1.074 1.094-.592 0-1.075-.49-1.075-1.094 0-.601.483-1.088 1.075-1.088"/></g><text x="172" y="57" font-size="16" fill="#1f2328" font-weight="700" text-anchor="start">Processo 1 · dispositivo</text><text x="172" y="75" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">python -m device.main · caminhos relativos a device/ · tudo aqui funciona sem rede</text>
+<path d="M935,405 L1125,405" fill="none" stroke="#0969da" stroke-width="2.5" marker-end="url(#ponta-rede)"/>
+<path d="M1125,430 L935,430" fill="none" stroke="#0969da" stroke-width="2.5" marker-end="url(#ponta-rede)"/>
+<rect x="985.0" y="391" width="110" height="52" rx="26" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="1040.0" y="413" font-size="13" fill="#0969da" font-weight="700" text-anchor="middle">WebSocket</text>
+<text x="1040.0" y="430" font-size="11.5" fill="#0969da" font-weight="500" text-anchor="middle">só texto</text>
+<text x="1040.0" y="365" font-size="12" fill="#0969da" font-weight="500" text-anchor="middle">session_start</text><text x="1040.0" y="381" font-size="12" fill="#0969da" font-weight="500" text-anchor="middle">utterance · tool_result</text>
+<text x="1040.0" y="462" font-size="12" fill="#0969da" font-weight="500" text-anchor="middle">state · transcript</text><text x="1040.0" y="478" font-size="12" fill="#0969da" font-weight="500" text-anchor="middle">tool_call · error</text>
+<path d="M252,130 L252,112 Q252,104 260,104 L814,104 Q822,104 822,112 L822,130" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<rect x="341.2" y="94" width="391.6" height="20" rx="6" fill="#ffffff"/><text x="537.0" y="108" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">sem wake word (o padrão), ou por 8 s depois de uma pergunta</text>
+<rect x="140" y="130" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="154" y="147" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(162,155) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3" />
+  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+  <rect x="9" y="2" width="6" height="13" rx="3" /></g><text x="206" y="163" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Microfone + VAD</text><text x="206" y="182" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">audio/capture.py</text>
+<rect x="425" y="130" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="439" y="147" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(447,155) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0" />
+  <path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4" /></g><text x="491" y="163" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Wake word</text><text x="491" y="182" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">activation/wake.py</text>
+<rect x="710" y="130" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="724" y="147" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(732,155) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2" />
+  <path d="M7 15h4M15 15h2M7 11h2M13 11h4" /></g><text x="776" y="163" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">STT faster-whisper</text><text x="776" y="182" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">stt/faster_whisper.py</text>
+<path d="M365,167 L425,167" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<path d="M650,167 L710,167" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<rect x="140" y="255" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="154" y="272" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(162,280) scale(1.0)" fill="#003B57"><path d="M21.678.521c-1.032-.92-2.28-.55-3.513.544a8.71 8.71 0 0 0-.547.535c-2.109 2.237-4.066 6.38-4.674 9.544.237.48.422 1.093.544 1.561a13.044 13.044 0 0 1 .164.703s-.019-.071-.096-.296l-.05-.146a1.689 1.689 0 0 0-.033-.08c-.138-.32-.518-.995-.686-1.289-.143.423-.27.818-.376 1.176.484.884.778 2.4.778 2.4s-.025-.099-.147-.442c-.107-.303-.644-1.244-.772-1.464-.217.804-.304 1.346-.226 1.478.152.256.296.698.422 1.186.286 1.1.485 2.44.485 2.44l.017.224a22.41 22.41 0 0 0 .056 2.748c.095 1.146.273 2.13.5 2.657l.155-.084c-.334-1.038-.47-2.399-.41-3.967.09-2.398.642-5.29 1.661-8.304 1.723-4.55 4.113-8.201 6.3-9.945-1.993 1.8-4.692 7.63-5.5 9.788-.904 2.416-1.545 4.684-1.931 6.857.666-2.037 2.821-2.912 2.821-2.912s1.057-1.304 2.292-3.166c-.74.169-1.955.458-2.362.629-.6.251-.762.337-.762.337s1.945-1.184 3.613-1.72C21.695 7.9 24.195 2.767 21.678.521m-18.573.543A1.842 1.842 0 0 0 1.27 2.9v16.608a1.84 1.84 0 0 0 1.835 1.834h9.418a22.953 22.953 0 0 1-.052-2.707c-.006-.062-.011-.141-.016-.2a27.01 27.01 0 0 0-.473-2.378c-.121-.47-.275-.898-.369-1.057-.116-.197-.098-.31-.097-.432 0-.12.015-.245.037-.386a9.98 9.98 0 0 1 .234-1.045l.217-.028c-.017-.035-.014-.065-.031-.097l-.041-.381a32.8 32.8 0 0 1 .382-1.194l.2-.019c-.008-.016-.01-.038-.018-.053l-.043-.316c.63-3.28 2.587-7.443 4.8-9.791.066-.069.133-.128.198-.194Z"/></g><text x="206" y="288" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">SQLite</text><text x="206" y="307" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">local/store.py</text>
+<rect x="425" y="255" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="439" y="272" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(447,280) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8" />
+  <path d="M12 9v4l2 2" />
+  <path d="M5 3 2 6" />
+  <path d="m22 6-3-3" />
+  <path d="M6.38 18.7 4 21" />
+  <path d="M17.64 18.67 20 21" /></g><text x="491" y="288" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Serviços locais</text><text x="491" y="307" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">local/service.py</text>
+<rect x="710" y="255" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="724" y="272" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(732,280) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5" />
+  <path d="M8 3H3v5" />
+  <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
+  <path d="m15 9 6-6" /></g><text x="776" y="288" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Roteador nível 0</text><text x="776" y="307" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">router/intents.py</text>
+<path d="M822,204 L822,255" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<path d="M710,280 L650,280" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<text x="680" y="272" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">casou</text>
+<path d="M425,292 L365,292" fill="none" stroke="#1f2328" stroke-width="1.75" marker-start="url(#ponta-local)" marker-end="url(#ponta-local)"/>
+<rect x="140" y="380" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="154" y="397" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(162,405) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2v3" />
+  <path d="M17 15.5v1.7l1 .625" />
+  <path d="M21 8.936V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h3.935" />
+  <path d="M3 9h9.873" />
+  <path d="M8 2v3" />
+  <circle cx="17" cy="17" r="5" /></g><text x="206" y="413" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Agendador</text><text x="206" y="432" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">local/scheduler.py</text>
+<rect x="710" y="380" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="724" y="397" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(732,405) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5" />
+  <path d="M15 8V2" />
+  <path d="M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z" />
+  <path d="M9 8V2" /></g><text x="776" y="413" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">GatewayClient</text><text x="776" y="432" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">ws_client.py</text>
+<path d="M252,329 L252,380" fill="none" stroke="#1f2328" stroke-width="1.75" marker-start="url(#ponta-local)" marker-end="url(#ponta-local)"/>
+<path d="M822,329 L822,380" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<text x="834" y="359" font-size="12" fill="#59636e" font-weight="500" text-anchor="start">não casou</text>
+<path d="M710,417 L688,417 Q680,417 680,409 L680,315 Q680,307 672,307 L650,307" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<text x="670" y="359" font-size="12" fill="#59636e" font-weight="500" text-anchor="end">tool_call</text>
+<rect x="140" y="505" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="154" y="522" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(162,530) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <path d="M16 9a5 5 0 0 1 0 6" />
+  <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></g><text x="206" y="538" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Alto-falante</text><text x="206" y="557" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">audio/playback.py</text>
+<rect x="425" y="505" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="439" y="522" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(447,530) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3" />
+  <path d="M6 6v11" />
+  <path d="M10 3v18" />
+  <path d="M14 8v7" />
+  <path d="M18 5v13" />
+  <path d="M22 10v3" /></g><text x="491" y="538" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">TTS Piper</text><text x="491" y="557" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">tts/piper_voice.py</text>
+<path d="M365,417 L467,417 Q475,417 475,425 L475,505" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<text x="395" y="409" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">venceu</text>
+<path d="M555,329 L555,505" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<text x="567" y="421" font-size="12" fill="#59636e" font-weight="500" text-anchor="start">frase a falar</text>
+<path d="M822,454 L822,534 Q822,542 814,542 L650,542" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<rect x="682.4" y="532" width="129.2" height="20" rx="6" fill="#ffffff"/><text x="747" y="546" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">frases da resposta</text>
+<path d="M425,542 L365,542" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<rect x="140" y="630" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="154" y="647" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(162,655) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2" />
+  <path d="M7 11v4a2 2 0 0 0 2 2h4" />
+  <rect width="8" height="8" x="13" y="13" rx="2" /></g><text x="206" y="663" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Máquina de estados</text><text x="206" y="682" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">state.py</text>
+<rect x="425" y="630" width="225" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="439" y="647" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(447,655) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10V9" />
+  <path d="M16.472 15a6 6 0 01-8.943 0" />
+  <path d="M9 10V9" />
+  <circle cx="12" cy="12" r="10" /></g><text x="491" y="663" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Servidor do rosto</text><text x="491" y="682" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">rosto/server.py</text>
+<path d="M365,667 L425,667" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<path d="M650,667 L1125,667" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<rect x="709.4" y="657" width="225.20000000000002" height="20" rx="6" fill="#ffffff"/><text x="822" y="671" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">WebSocket local · state + emotion</text>
+<rect x="1125" y="380" width="165" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="1139" y="397" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(1147,405) scale(1.0)" fill="#009688"><path d="M12 .0387C5.3729.0384.0003 5.3931 0 11.9988c-.001 6.6066 5.372 11.9628 12 11.9625 6.628.0003 12.001-5.3559 12-11.9625-.0003-6.6057-5.3729-11.9604-12-11.96m-.829 5.4153h7.55l-7.5805 5.3284h5.1828L5.279 18.5436q2.9466-6.5444 5.892-13.0896"/></g><text x="1191" y="413" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Gateway</text><text x="1191" y="432" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">api/session.py</text>
+<text x="1207.5" y="474" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">o outro processo</text>
+<rect x="1125" y="630" width="165" height="74" rx="10" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><rect x="1139" y="647" width="40" height="40" rx="9" fill="#f6f8fa" stroke="#d1d9e0"/><g transform="translate(1147,655) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" />
+  <path d="M10 4v4" />
+  <path d="M2 8h20" />
+  <path d="M6 4v4" /></g><text x="1191" y="663" font-size="15" fill="#1f2328" font-weight="600" text-anchor="start">Rosto</text><text x="1191" y="682" font-size="12" fill="#59636e" font-weight="400" text-anchor="start">no navegador</text>
+<circle cx="60" cy="167" r="26" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><g transform="translate(48,155) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+  <circle cx="12" cy="7" r="4" /></g><text x="60" y="213" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">Voz</text>
+<circle cx="60" cy="542" r="26" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"/><g transform="translate(48,530) scale(1.0)" fill="none" stroke="#1f2328" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <path d="M16 9a5 5 0 0 1 0 6" />
+  <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></g><text x="60" y="588" font-size="12" fill="#59636e" font-weight="500" text-anchor="middle">Alto-falante</text>
+<path d="M86,167 L140,167" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+<path d="M140,542 L86,542" fill="none" stroke="#1f2328" stroke-width="1.75" marker-end="url(#ponta-local)"/>
+</svg>
