@@ -256,13 +256,11 @@ class TestFerramentaQuebra:
     CASOS = {
         "spotify": ([_pausa()], {"spotify": SpotifyQueQuebra()}, None),
         "busca": ([_busca()], {"search": Busca(), "leitor": LeitorQueQuebra()}, None),
-        # Um `tool_result` sem o campo obrigatório `ok`: o `decode` levanta
-        # `TypeError`, que o `except ValueError` da espera não pega.
-        "ida_e_volta_ao_dispositivo": (
-            [_timer()],
-            {},
-            lambda m: [{"type": "tool_result", "id": m["id"]}],
-        ),
+        # A ida e volta ao dispositivo saiu daqui: um `tool_result` sem o campo
+        # obrigatório `ok` fazia o `decode` levantar `TypeError` e caía nesta
+        # rede. O `decode` agora devolve `ValueError` para isso, e mensagem
+        # malformada na espera da ferramenta é o caso do `error` que encerra o
+        # turno, testado mais abaixo.
     }
 
     @pytest.fixture(params=sorted(CASOS))

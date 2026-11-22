@@ -143,6 +143,14 @@ o reserva. Depois que algo já foi falado, a falha encerra o turno com o aviso d
 modelo fora do ar. Quem falhou descansa 60 s, para o turno seguinte não pagar a
 espera de novo. O `/health` mostra os dois, sem a chave.
 
+**Sem reserva, uma segunda tentativa.** Se o modelo falha rápido — em até 3 s,
+antes da primeira palavra, e não com erro 4xx —, o pedido é repetido uma vez
+(`LLM_RETRIES`, padrão 1; 0 desliga). O caso típico é a conexão ociosa que o
+provedor já fechou. Nunca se repete depois de algo dito, e ferramenta nunca é
+reexecutada. O limite de `LLM_FIRST_DELTA_TIMEOUT` só existe com reserva: sem
+ele, um provedor que não responde segura o turno até `LLM_TIMEOUT`, então vale
+baixar esse valor na VPS.
+
 **Nada disso rodou contra um provedor de verdade.** Os 38 testes usam um
 servidor falso, e os detalhes de cada API — o que o Gemini exige de volta numa
 chamada de ferramenta, quais valores de `reasoning_effort` cada um aceita —

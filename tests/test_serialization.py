@@ -85,3 +85,10 @@ def test_unexpected_field_is_rejected():
 def test_missing_type_is_rejected():
     with pytest.raises(ValueError, match="no 'type' field"):
         decode('{"text": "oi"}')
+
+
+def test_campo_obrigatorio_ausente_e_valueerror():
+    """Quem chama o `decode` so sabe tratar `ValueError`."""
+    with pytest.raises(ValueError, match="utterance"):
+        decode('{"type": "utterance"}')
+

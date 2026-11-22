@@ -46,4 +46,11 @@ def decode(raw: str | bytes) -> Any:
     if unknown:
         raise ValueError(f"{kind}: unexpected field(s) {sorted(unknown)}")
 
-    return cls(**{k: v for k, v in payload.items() if k in known})
+    try:
+        return cls(**{k: v for k, v in payload.items() if k in known})
+    except TypeError as exc:
+        # Campo obrigatório ausente. Sem isto subia um `TypeError`, que quem
+        # chama não espera: os dois lados tratam mensagem ruim como
+        # `ValueError`, e um `{"type": "utterance"}` sem `text` fechava o socket
+        # em vez de virar um `error`.
+        raise ValueError(f"{kind}: {exc}") from exc
