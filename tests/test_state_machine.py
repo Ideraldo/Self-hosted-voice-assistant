@@ -89,7 +89,7 @@ class TestErroDoGatewayNoMeioDoTurno:
     async def test_a_frase_seguinte_funciona(self):
         """O laço de texto inteiro: um turno com erro, e outro normal depois."""
         from common.messages import Error, StateMessage, Transcript
-        from device.main import answer
+        from device.main import ERRO_DO_GATEWAY, answer
 
         cliente, voz, alto_falante, falando = self._pecas(
             [
@@ -112,5 +112,6 @@ class TestErroDoGatewayNoMeioDoTurno:
                 cliente, sm, voz, alto_falante, None, falando, "quem descobriu o brasil"
             )
 
-        assert alto_falante.falado == ["Foi Cabral."]
+        # O turno do erro não é mudo: sem tela, o aviso falado é o único.
+        assert alto_falante.falado == [ERRO_DO_GATEWAY, "Foi Cabral."]
         assert sm.state is State.IDLE

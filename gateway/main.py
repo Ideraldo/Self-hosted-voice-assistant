@@ -181,5 +181,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         spotify=spotify,
         search=search,
         leitor=leitor,
+        # Com reserva, quem tenta de novo é o `FallbackProvider`, no outro
+        # provedor; repetir a fila inteira aqui pagaria as duas esperas em dobro.
+        llm_retries=config.llm_retries if config.llm_fallback is None else 0,
     )
     await session.run()

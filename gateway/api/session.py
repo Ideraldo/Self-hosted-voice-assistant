@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -64,6 +65,29 @@ TOOL_TIMEOUT = 10.0
 LLM_FORA_DO_AR = "Nao consegui falar com o modelo agora. Tenta de novo daqui a pouco."
 
 
+#: O modelo respondeu, e respondeu nada: texto vazio, ou só pedidos de
+#: ferramenta até estourar as rodadas. Não é a frase de cima de propósito -- o
+#: provedor está de pé, e mandar a pessoa esperar "um pouco" seria mentira; o
+#: que resolve é perguntar de novo, talvez de outro jeito.
+SEM_RESPOSTA = "Nao consegui responder a isso. Tenta de novo."
+
+#: Uma ferramenta levantou exceção que ninguém previa: defeito nosso, ou uma
+#: API que mudou de forma. A terceira frase, pela mesma razão das outras duas:
+#: quem ouve precisa saber que foi **a ação** que não saiu, e não o modelo nem o
+#: servidor. O detalhe fica no log, com traceback.
+FERRAMENTA_QUEBROU = "Deu um erro aqui e eu nao consegui fazer isso."
+
+#: A retentativa do pedido ao LLM (`llm_retries`). A pausa é curta porque o
+#: caso que ela cobre -- conexão ociosa que o provedor fechou, um 5xx solto --
+#: some sozinho na conexão seguinte; esperar mais é silêncio a troco de nada.
+RETRY_PAUSA = 0.3
+
+#: Só se repete o que falhou depressa. Conexão recusada ou derrubada e 5xx
+#: chegam em menos de um segundo; o que demorou mais que isto para falhar é
+#: tempo esgotado, e repetir dobraria o silêncio de quem já esperou demais.
+RETRY_JANELA = 3.0
+
+
 class LLMIndisponivel(Exception):
     """O provedor do LLM falhou: fora do ar, tempo esgotado, erro HTTP.
 
@@ -78,6 +102,33 @@ class LLMIndisponivel(Exception):
     def __init__(self, falando: bool) -> None:
         super().__init__("o provedor do LLM falhou")
         self.falando = falando
+
+
+class TurnoAbortado(Exception):
+    """O turno acabou num `error`, e depois dele nada mais vai pelo fio.
+
+    No protocolo, `error` encerra o turno dos dois lados: o dispositivo volta
+    para IDLE ao recebê-lo e para de ler. Seguir com o turno depois de avisar
+    -- que era o que a espera da ferramenta fazia -- deixava `speaking`, as
+    frases e o `idle` na fila do socket, para o turno **seguinte** ler como se
+    fossem dele.
+
+    É uma classe à parte, e não um `except Exception`, pela mesma razão de
+    `LLMIndisponivel`: cada falha tem a sua frase, e esta é a do dispositivo.
+    """
+
+
+def _falha_definitiva(exc: BaseException) -> bool:
+    """O provedor **recusou** o pedido (4xx), em vez de falhar em atendê-lo?
+
+    Chave errada, histórico inválido, cota estourada: o segundo pedido recebe a
+    mesma recusa. O status é procurado nos dois lugares em que os provedores
+    daqui o deixam -- `ErroHTTP.status` e a resposta do `httpx.HTTPStatusError`.
+    """
+    status = getattr(exc, "status", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    return isinstance(status, int) and 400 <= status < 500
 
 
 def _fim_de_frase(texto: str) -> bool:
@@ -108,6 +159,7 @@ class Session:
         spotify: object | None = None,
         search: object | None = None,
         leitor: object | None = None,
+        llm_retries: int = 0,
     ) -> None:
         self._ws = websocket
         self._llm = llm
@@ -128,6 +180,10 @@ class Session:
         )
         # Ver `_pedir_resposta`. Vale por um turno só: `_turn` zera no começo.
         self._expects_reply = False
+        # Quantas vezes repetir o pedido ao LLM que falhou antes de começar a
+        # responder. Zero aqui; quem liga é o `gateway.main`, e só sem reserva
+        # -- com reserva, a retentativa é o outro provedor.
+        self._llm_retries = llm_retries
 
     def _pedir_resposta(self) -> None:
         """Marca que este turno termina numa pergunta ao usuário.
@@ -204,13 +260,34 @@ class Session:
                 await self._send(StateMessage(value=State.SPEAKING))
             await self._send(Transcript(text=LLM_FORA_DO_AR, role="assistant", final=False))
             answer = ""
+        except TurnoAbortado as exc:
+            log.warning("turno abortado: %s", exc)
+            self._conversation.rollback(antes)
+            # O `error` é a última mensagem deste turno, e não vem `idle`
+            # depois: o dispositivo sai do turno ao lê-lo, e um `idle` sobrando
+            # na fila encerraria o turno seguinte antes de ele começar. A frase
+            # falada é a do dispositivo -- aqui não vai transcript, para a
+            # mesma falha não ser dita duas vezes.
+            await self._send(Error(message=str(exc)))
+            return
+        else:
+            if not answer:
+                # O modelo devolveu vazio, ou pediu ferramenta até estourar as
+                # rodadas sem dizer nada. Sem isto o aparelho ia de `thinking`
+                # a `idle` calado, e silêncio parece microfone com defeito.
+                # Resposta vazia quer dizer que nada foi falado -- toda frase
+                # enviada entra em `full` --, então o `speaking` ainda não saiu.
+                log.warning("turno sem resposta do modelo")
+                await self._send(StateMessage(value=State.SPEAKING))
+                await self._send(Transcript(text=SEM_RESPOSTA, role="assistant", final=False))
         if answer:
             self._conversation.add_assistant(answer)
         else:
             # Turno sem resposta nenhuma -- o modelo devolveu vazio, ou só pediu
             # ferramenta até estourar as rodadas. Deixar a pergunta no histórico
-            # faria o turno seguinte começar com dois `user` seguidos. Ferramenta
-            # terminal não cai aqui: a frase dela é a resposta.
+            # faria o turno seguinte começar com dois `user` seguidos; o aviso
+            # falado acima também não entra, porque não é resposta a nada.
+            # Ferramenta terminal não cai aqui: a frase dela é a resposta.
             self._conversation.rollback(antes)
 
         # `None`, e não `False`, quando ninguém perguntou: o campo nem vai para
@@ -277,18 +354,41 @@ class Session:
             # final=False: mais frases vêm em seguida nesta mesma resposta.
             await self._send(Transcript(text=sentence.strip(), role="assistant", final=False))
 
+        retentativas = self._llm_retries
+
         async def stream():
             # Só a falha do provedor vira `LLMIndisponivel`. O que quebra no
             # corpo do laço abaixo -- o socket do dispositivo caindo no meio de
             # um `flush`, por exemplo -- não passa por aqui e continua sendo o
             # que era.
-            try:
-                async for delta in self._llm.respond(
-                    self._conversation.prompt(), tools=self._tools
-                ):
-                    yield delta
-            except Exception as exc:  # noqa: BLE001 -- cada provedor falha do seu jeito
-                raise LLMIndisponivel(falando=spoken) from exc
+            nonlocal retentativas
+            while True:
+                entregou = False
+                inicio = time.monotonic()
+                try:
+                    async for delta in self._llm.respond(
+                        self._conversation.prompt(), tools=self._tools
+                    ):
+                        entregou = True
+                        yield delta
+                    return
+                except Exception as exc:  # noqa: BLE001 -- cada provedor falha do seu jeito
+                    # Repete-se só o **pedido**, e só enquanto nada saiu dele:
+                    # um `Delta` entregue pode já ter sido falado, ou ser uma
+                    # chamada de ferramenta já executada. As ferramentas das
+                    # rodadas anteriores estão no histórico e não rodam de novo.
+                    # A conta é por turno, não por rodada: uma retentativa é o
+                    # que cabe numa conversa falada.
+                    if (
+                        entregou
+                        or retentativas <= 0
+                        or time.monotonic() - inicio > RETRY_JANELA
+                        or _falha_definitiva(exc)
+                    ):
+                        raise LLMIndisponivel(falando=spoken) from exc
+                    retentativas -= 1
+                    log.warning("llm falhou antes de responder (%r); tentando de novo", exc)
+                    await asyncio.sleep(RETRY_PAUSA)
 
         # Uma rodada por chamada de ferramenta: o modelo pede, o dispositivo
         # executa, o resultado volta para o histórico e o modelo continua. Sem
@@ -328,13 +428,24 @@ class Session:
                 log.warning("modelo insistiu em ferramenta apos %d rodadas", rodada)
                 break
 
-            if nome in SEARCH_TOOL_NAMES:
-                resultado = await executar_busca(self._search, nome, args, self._leitor)
-            elif nome in SPOTIFY_TOOL_NAMES:
-                # O gateway executa: o segredo mora aqui.
-                resultado = await executar_spotify(self._spotify, nome, args)
-            else:
-                resultado = await self._run_device_tool(nome, args)
+            quebrou = False
+            try:
+                resultado = await self._executar(nome, args)
+            except (WebSocketDisconnect, TurnoAbortado):
+                # Não são defeito de ferramenta: o socket caiu, ou o turno já
+                # foi encerrado com `error`. Cada um tem quem o trate acima.
+                raise
+            except Exception:  # noqa: BLE001 -- ver o comentário abaixo
+                # As ferramentas viram frase o erro que conhecem; o que chega
+                # aqui é o que ninguém previu -- um `KeyError` num JSON que
+                # mudou de forma, um defeito nosso. Subindo, fechava o socket e
+                # o dispositivo dizia que o servidor caiu, com o servidor de pé.
+                # O `except` largo cobre **só** a execução da ferramenta: em
+                # volta do turno ele também engoliria defeito do laço e do
+                # histórico, e diria a frase errada para eles.
+                log.exception("ferramenta %s %s levantou excecao", nome, args)
+                resultado = "falhou: erro interno ao executar a ferramenta"
+                quebrou = True
             turn.mark(f"ferramenta:{nome}")
 
             # O par pedido/resultado vai para o histórico **sempre**, inclusive
@@ -348,6 +459,16 @@ class Session:
                 call_id = f"call_{uuid.uuid4().hex[:24]}"
             self._conversation.add_tool_call(nome, args, call_id)
             self._conversation.add_tool_result(nome, resultado, call_id)
+
+            if quebrou:
+                # O par acima fica no histórico com a falha, e a frase fixa o
+                # fecha como a de uma ferramenta terminal faria. Não há rodada
+                # extra para o modelo comentar: ele só poderia inventar um
+                # motivo, e a ferramenta que acabou de quebrar seria a primeira
+                # que ele pediria de novo.
+                await flush(FERRAMENTA_QUEBROU)
+                full += FERRAMENTA_QUEBROU
+                break
 
             if nome in TERMINAL_TOOLS or nome in SPOTIFY_TOOL_NAMES:
                 # A frase devolvida já está pronta para ser falada. Ela vai como
@@ -365,6 +486,15 @@ class Session:
             await self._send(Transcript(text=full.strip(), role="assistant", final=True))
         turn.mark("resposta")
         return full.strip()
+
+    async def _executar(self, nome: str, args: dict) -> str:
+        """Entrega a chamada a quem a executa, pelo nome (seção 5, regra 3)."""
+        if nome in SEARCH_TOOL_NAMES:
+            return await executar_busca(self._search, nome, args, self._leitor)
+        if nome in SPOTIFY_TOOL_NAMES:
+            # O gateway executa: o segredo mora aqui.
+            return await executar_spotify(self._spotify, nome, args)
+        return await self._run_device_tool(nome, args)
 
     async def _run_device_tool(self, name: str, args: dict) -> str:
         """Pede ao dispositivo que execute, e espera o resultado.
@@ -408,8 +538,10 @@ class Session:
             try:
                 message = decode(raw)
             except ValueError as exc:
-                await self._send(Error(message=str(exc)))
-                continue
+                # Avisar e continuar esperando -- o que isto fazia -- deixava as
+                # duas pontas em turnos diferentes: o dispositivo sai do turno
+                # no `error`. Quem manda o `error` é `_turn`, por último.
+                raise TurnoAbortado(str(exc)) from exc
             if isinstance(message, ToolResult) and message.id == call_id:
                 return message
             log.debug("ignoring %s while waiting for tool_result", getattr(message, "type", "?"))

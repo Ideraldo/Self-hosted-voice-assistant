@@ -98,7 +98,15 @@ async def test_espera_o_gateway_subir_em_vez_de_desistir():
     e é justamente quando ninguém está olhando que o link cai.
     """
     gw = FakeGateway()
-    porta = 8765
+    # Uma porta livre, pedida ao sistema: a 8765 fixa que estava aqui falhava
+    # com qualquer coisa ouvindo nela -- e é a do redirect da autenticação das
+    # finanças. O socket é fechado antes de o cliente tentar, porque o teste
+    # precisa justamente de ninguém atendendo na primeira tentativa.
+    import socket
+
+    with socket.socket() as reserva:
+        reserva.bind(("127.0.0.1", 0))
+        porta = reserva.getsockname()[1]
     gw.url = f"ws://127.0.0.1:{porta}"
 
     async def sobe_o_gateway_depois():

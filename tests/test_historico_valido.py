@@ -22,6 +22,7 @@ from gateway.conversation.history import Conversation
 from gateway.llm.base import Delta, Message
 from gateway.llm.ollama import _wire
 from gateway.llm.openai_compat import _wire as _wire_openai
+from gateway.tools.search import Resultado
 
 
 def conferir(historico: list[Message]) -> None:
@@ -98,6 +99,15 @@ class LLMRoteirizado:
 class Aparelho:
     """O outro lado do socket: manda frases e executa o que o gateway pedir."""
 
+    #: O que o aparelho devolve fora do combinado, por ferramenta: lixo no
+    #: lugar do JSON (o gateway encerra o turno com `error`) e um resultado sem
+    #: o campo obrigatório `ok` (o `decode` levanta `TypeError`, que cai na
+    #: rede das ferramentas que quebram).
+    FORA_DO_COMBINADO = {
+        "listar_agendamentos": lambda m: "{isto nao e json",
+        "criar_alarme": lambda m: json.dumps({"type": "tool_result", "id": m["id"]}),
+    }
+
     def __init__(self, frases: list[str], falha: bool = False) -> None:
         self._entrada = [
             json.dumps({"type": "session_start", "device_id": "d", "token": "t"})
@@ -112,7 +122,9 @@ class Aparelho:
 
     async def send_text(self, raw: str) -> None:
         mensagem = json.loads(raw)
-        if mensagem["type"] == "tool_call":
+        if mensagem["type"] == "tool_call" and mensagem["name"] in self.FORA_DO_COMBINADO:
+            self._entrada.insert(0, self.FORA_DO_COMBINADO[mensagem["name"]](mensagem))
+        elif mensagem["type"] == "tool_call":
             resultado = {"type": "tool_result", "id": mensagem["id"], "ok": not self._falha}
             if self._falha:
                 resultado["error"] = "nao deu"
@@ -133,12 +145,25 @@ class Spotify:
     async def pausar(self) -> str:
         return "Pausado."
 
+    async def proxima(self) -> str:
+        # Nem `SpotifyError` nem erro HTTP: o que `executar_spotify` não pega.
+        raise KeyError("item")
+
 
 class Busca:
     nome = "fake"
 
     async def buscar(self, consulta, quantos):
+        if consulta == "quebra":
+            return [Resultado(titulo="t", trecho="x", url="https://exemplo.com/")]
         return []
+
+
+class Leitor:
+    """Só é chamado quando há resultado -- e aí quebra, depois da busca."""
+
+    async def ler(self, url):
+        raise RuntimeError("defeito no leitor")
 
 
 def _timer(call_id: str | None = None) -> Delta:
@@ -153,6 +178,24 @@ def _busca(call_id: str | None = None) -> Delta:
     return Delta(
         tool_name="buscar_na_internet", tool_args={"consulta": "lua"}, tool_call_id=call_id
     )
+
+
+def _proxima(call_id: str | None = None) -> Delta:
+    return Delta(tool_name="proxima_musica", tool_args={}, tool_call_id=call_id)
+
+
+def _busca_que_quebra(call_id: str | None = None) -> Delta:
+    return Delta(
+        tool_name="buscar_na_internet", tool_args={"consulta": "quebra"}, tool_call_id=call_id
+    )
+
+
+def _listar(call_id: str | None = None) -> Delta:
+    return Delta(tool_name="listar_agendamentos", tool_args={}, tool_call_id=call_id)
+
+
+def _alarme(call_id: str | None = None) -> Delta:
+    return Delta(tool_name="criar_alarme", tool_args={"hora": "07:00"}, tool_call_id=call_id)
 
 
 def _caiu() -> Exception:
@@ -177,6 +220,14 @@ TURNOS = {
     "estouro": lambda i: [[_busca(i)]] * (MAX_TOOL_ROUNDS + 1),
     "estouro_falando": lambda i: [[Delta(text="Um momento."), _busca(i)]]
     + [[_busca(i)]] * MAX_TOOL_ROUNDS,
+    # As falhas de ferramenta. Em todas o turno acaba na primeira rodada: a que
+    # quebra é fechada pela frase fixa, a que aborta é desfeita inteira.
+    "gateway_quebra": lambda i: [[_proxima(i)]],
+    "busca_quebra": lambda i: [[_busca_que_quebra(i)]],
+    "busca_e_depois_quebra": lambda i: [[_busca(i)], [Delta(text="Achei."), _proxima(i)]],
+    "dispositivo_quebra": lambda i: [[_alarme(i)]],
+    "dispositivo_manda_lixo": lambda i: [[_listar(i)]],
+    "busca_e_dispositivo_manda_lixo": lambda i: [[_busca(i)], [_listar(i)]],
 }
 
 
@@ -187,6 +238,7 @@ def montar(llm, frases, max_turns=12, falha_no_aparelho=False) -> Session:
         expected_token="t",
         spotify=Spotify(),
         search=Busca(),
+        leitor=Leitor(),
     )
     session._conversation = Conversation(max_turns=max_turns)
     return session

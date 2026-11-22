@@ -62,6 +62,13 @@ log = logging.getLogger("ideraldinho.device")
 PERGUNTA_GATEWAY = "gateway"
 PERGUNTA_LOCAL = "local"
 
+#: O que o aparelho diz quando o gateway encerra o turno com `error`. É fixa: o
+#: texto do erro ("tool_result: unexpected field(s)...") é para o log, e lido
+#: pelo Piper não ajuda ninguém. As outras falhas -- modelo fora do ar, resposta
+#: vazia, ferramenta que quebrou -- chegam como frase do próprio gateway e sem
+#: `error`, então nenhuma é dita duas vezes.
+ERRO_DO_GATEWAY = "Deu um erro na conversa com o servidor. Tenta de novo."
+
 
 async def read_line(prompt: str) -> str:
     """Read stdin without blocking the event loop (and thus the socket)."""
@@ -188,8 +195,15 @@ async def handle_incoming(
             # máquina em LISTENING ou THINKING não quebra nada agora: quebra na
             # frase seguinte, com `ValueError` na transição para LISTENING. Todo
             # estado tem saída legal para IDLE, então não há caminho a escolher.
-            if machine.state is not State.IDLE:
-                machine.transition(State.IDLE)
+            #
+            # Antes de voltar, o aparelho diz que deu erro. Só imprimir bastava
+            # com alguém olhando o terminal; na prateleira, sem tela, o `error`
+            # era silêncio. O gateway não manda mais nada deste turno depois
+            # dele, então é seguro sair daqui sem esperar um `idle`.
+            _ate_falar(machine)
+            async with falando:
+                await speak(voice, speaker, ERRO_DO_GATEWAY)
+            machine.transition(State.IDLE)
             return False
 
     return False

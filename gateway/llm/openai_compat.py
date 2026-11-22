@@ -148,6 +148,19 @@ def _juntar(chamadas: dict[int, dict[str, Any]], pedaco: dict[str, Any]) -> None
         chamada["extras"]["extra_content"] = pedaco["extra_content"]
 
 
+class ErroHTTP(RuntimeError):
+    """A API respondeu com erro HTTP.
+
+    Continua sendo um `RuntimeError` com a mesma mensagem; o que ganha é o
+    `status` à parte, para quem precisa separar a recusa (4xx: repetir o pedido
+    dá no mesmo) da falha passageira (5xx) sem ler a mensagem.
+    """
+
+    def __init__(self, status: int, mensagem: str) -> None:
+        super().__init__(mensagem)
+        self.status = status
+
+
 class OpenAICompatProvider:
     def __init__(
         self,
@@ -223,7 +236,10 @@ class OpenAICompatProvider:
                 # recusado, cota estourada. Só um trecho, e sem a chave.
                 corpo = (await response.aread()).decode("utf-8", "replace")
                 trecho = self._sem_chave(" ".join(corpo.split())[:300])
-                raise RuntimeError(f"HTTP {response.status_code} de {self._url}: {trecho}")
+                raise ErroHTTP(
+                    response.status_code,
+                    f"HTTP {response.status_code} de {self._url}: {trecho}",
+                )
 
             async for line in response.aiter_lines():
                 # Linha em branco separa eventos; linha começando em ":" é

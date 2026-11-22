@@ -241,8 +241,9 @@ class TestLLMForaDoAr:
         await session.run()
 
         # Depois do `idle` do aperto de mão, o turno inteiro. A frase vai como
-        # transcript parcial do assistente porque é a única coisa que o
-        # dispositivo fala; um `error` ele só imprime.
+        # transcript parcial do assistente porque é assim que o dispositivo
+        # fala a frase **desta** falha; um `error` encerraria o turno com a
+        # frase genérica dele.
         turno = [(m["type"], m.get("value") or m.get("text")) for m in socket.textos[1:]]
         assert turno == [
             ("state", "thinking"),

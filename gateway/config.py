@@ -65,6 +65,14 @@ class GatewayConfig:
     # reserva. Nao e o LLM_TIMEOUT: aquele pergunta se o modelo morreu, este se
     # a pessoa ainda esta esperando. So tem efeito com reserva configurado.
     llm_first_delta_timeout: float = float(os.getenv("LLM_FIRST_DELTA_TIMEOUT", "8"))
+    # Quantas vezes repetir o pedido ao LLM que falhou depressa, antes de
+    # comecar a responder (conexao derrubada, 5xx). O padrao e 1: a conexao
+    # ociosa que o provedor fechou entre duas perguntas e a falha mais comum de
+    # um aparelho que fala de vez em quando, e a segunda tentativa custa ~0,3 s
+    # contra a pessoa ter que repetir a frase inteira. Mais que 1 nao cabe num
+    # turno falado. 0 desliga. So vale sem reserva: com LLM_FALLBACK_PROVIDER,
+    # a retentativa e o reserva.
+    llm_retries: int = int(os.getenv("LLM_RETRIES", "1"))
     # Raciocinar antes de responder custa latencia e pode vazar para a fala.
     # Medido em D20: com isso ligado o turno passa de 2,8s para 10,3s.
     llm_think: bool = os.getenv("LLM_THINK", "false").lower() in ("1", "true", "sim")
