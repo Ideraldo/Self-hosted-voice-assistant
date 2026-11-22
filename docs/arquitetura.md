@@ -258,7 +258,10 @@ O que notar:
 
 - **O gateway dirige o estado do dispositivo durante o nível 2.** `thinking`,
   `speaking` e `idle` chegam como mensagens `state` e o dispositivo aplica na
-  própria máquina. O `idle` final é o que encerra o turno do lado de cá.
+  própria máquina. O `idle` final é o que encerra o turno do lado de cá. Um
+  `error` também encerra, dos dois lados, e é a última mensagem do turno: não
+  vem `idle` depois dele, e o dispositivo fala uma frase fixa antes de voltar a
+  `IDLE` — num aparelho sem tela, erro que só se imprime é silêncio.
 - **`transcript` tem três usos.** `role=user` é o eco do que foi entendido;
   `role=assistant final=false` é uma frase para falar agora;
   `role=assistant final=true` é a resposta inteira, que o dispositivo não fala
@@ -285,11 +288,11 @@ stateDiagram-v2
     direction LR
     [*] --> IDLE
     IDLE --> LISTENING: microfone aberto para a fala, ou texto digitado
-    LISTENING --> IDLE: 30 s sem fala, transcrição vazia, ou error do gateway
+    LISTENING --> IDLE: 30 s sem fala, ou transcrição vazia
     LISTENING --> THINKING: nível 0 casou, ou o gateway mandou state thinking
-    THINKING --> SPEAKING: primeira frase a falar
-    THINKING --> IDLE: resposta vazia, ou error do gateway
-    SPEAKING --> IDLE: fim do turno, ou error do gateway
+    THINKING --> SPEAKING: primeira frase a falar, ou o aviso de um error do gateway
+    THINKING --> IDLE: nada a falar
+    SPEAKING --> IDLE: fim do turno
     SPEAKING --> LISTENING: barge-in, permitido mas ainda sem quem dispare
 ```
 
@@ -341,7 +344,7 @@ flowchart TD
     HIST["Histórico, sempre:<br/>add_tool_call + add_tool_result"]
     TERM{"Resultado é terminal?<br/>agenda ou Spotify"}
     FALA["flush do resultado<br/>falado como veio, sem 2a rodada"]
-    RESTO["flush do que sobrou<br/>transcript final=true<br/>add_assistant, ou desfaz o turno<br/>se nada foi dito"]
+    RESTO["flush do que sobrou<br/>transcript final=true<br/>add_assistant — ou, se nada foi dito,<br/>desfaz o turno e avisa em voz alta"]
     IDLE["state idle<br/>log dos tempos do turno"]
 
     INI --> LLM --> DELTA
@@ -390,10 +393,18 @@ O que notar:
 - **Há teto.** `MAX_TOOL_ROUNDS = 3`: no quarto pedido de ferramenta dentro do
   mesmo turno o laço desiste em vez de deixar o aparelho preso em `THINKING`.
   A chamada que não rodou não deixa rastro; e um turno que termina sem nada
-  dito — este, ou uma resposta vazia do modelo — é desfeito por inteiro.
+  dito — este, ou uma resposta vazia do modelo — é desfeito por inteiro, e a
+  pessoa ouve "não consegui responder a isso" em vez de silêncio.
 - **Falha de ferramenta é texto, não exceção.** Timeout do dispositivo, erro do
   Spotify e busca fora do ar voltam como "falhou: ..." ou como uma frase
-  falável.
+  falável. Isso vale para o erro esperado; o inesperado — um defeito dentro da
+  ferramenta — é capturado na sessão, registrado com o traceback, guardado no
+  histórico como falha do par e dito em voz alta. A sessão continua.
+- **Nenhuma falha é muda, e cada uma tem a sua frase.** Modelo fora do ar,
+  resposta vazia, ferramenta quebrada, mensagem malformada e gateway
+  inalcançável são ditos com frases diferentes, e nenhum caminho fala a mesma
+  falha duas vezes. Sem reserva configurado, um pedido ao modelo que falha
+  rápido e antes da primeira palavra é repetido uma vez (`LLM_RETRIES`).
 - **Ferramenta que não pode ser usada não é declarada.** Sem credenciais ou sem
   refresh token, as de música somem da lista; com `SEARCH_PROVIDER=none`, a de
   busca também (D19).
